@@ -60,7 +60,7 @@ private[spark] class GpuDatasetRDD(
     }
 
     // Register an on-task-completion callback to close the input stream.
-    context.addTaskCompletionListener(_ => iterator.close())
+    context.addTaskCompletionListener[Unit](_ => iterator.close())
     iterator
   }
 

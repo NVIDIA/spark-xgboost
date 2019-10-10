@@ -95,10 +95,10 @@ class GpuDatasetSuite extends FunSuite with PerTest {
       PartitionedFile(null, "/g", 0, 67890)
     )
     val oldPartitions = Seq(
-      FilePartition(0, Seq(partFiles(0))),
+      FilePartition(0, Array(partFiles(0))),
       FilePartition(1, partFiles.slice(1, 4)),
       FilePartition(2, partFiles.slice(4, 6)),
-      FilePartition(3, Seq(partFiles(6)))
+      FilePartition(3, Array(partFiles(6)))
     )
     val oldset = new GpuDataset(null, null, null, false, Integer.MAX_VALUE, Some(oldPartitions))
     val newset = oldset.repartition(1)
@@ -122,10 +122,10 @@ class GpuDatasetSuite extends FunSuite with PerTest {
       PartitionedFile(null, "/g", 0, 67890)
     )
     val oldPartitions = Seq(
-      FilePartition(0, Seq(partFiles(0))),
+      FilePartition(0, Array(partFiles(0))),
       FilePartition(1, partFiles.slice(1, 4)),
       FilePartition(2, partFiles.slice(4, 6)),
-      FilePartition(3, Seq(partFiles(6)))
+      FilePartition(3, Array(partFiles(6)))
     )
     val oldset = new GpuDataset(null, null, null, false, Integer.MAX_VALUE, Some(oldPartitions))
     val newset = oldset.repartition(3)
