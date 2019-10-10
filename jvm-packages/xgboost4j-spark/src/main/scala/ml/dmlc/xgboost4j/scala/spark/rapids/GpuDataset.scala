@@ -584,7 +584,7 @@ object GpuDataset {
     //   preferredHosts: Seq[String])
     // We skip setting the preferredHosts for overloaded version
     try {
-      FilePartition(size, files)
+      FilePartition(size, Array(files: _*))
     } catch {
       case e: NoSuchMethodError =>
         logger.debug("FilePartition, normal Apache Spark version failed")
@@ -691,7 +691,7 @@ class ColumnBatchToRow() {
         }
       }
     }
-    taskContext.addTaskCompletionListener(_ => iter.close())
+    taskContext.addTaskCompletionListener[Unit](_ => iter.close())
     iter
   }
 
