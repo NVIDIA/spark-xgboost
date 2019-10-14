@@ -16,6 +16,7 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
+import ai.rapids.cudf.Table
 import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 
 import scala.collection.{AbstractIterator, Iterator, mutable}
@@ -305,13 +306,14 @@ class XGBoostRegressionModel private[ml] (
     0.0f
   }
 
-  private def transformInternal(dataset: GpuDataset): DataFrame = {
-    val schema = StructType(dataset.schema.fields ++
+  private def transformInternalHonorGpu(dataFrame: DataFrame): DataFrame = {
+    val originalSchema = dataFrame.schema
+    val schema = StructType(originalSchema.fields ++
       Seq(StructField(name = _originalPredictionCol, dataType =
         ArrayType(FloatType, containsNull = false), nullable = false)))
 
-    val bBooster = dataset.sparkSession.sparkContext.broadcast(_booster)
-    val appName = dataset.sparkSession.sparkContext.appName
+    val bBooster = dataFrame.sparkSession.sparkContext.broadcast(_booster)
+    val appName = dataFrame.sparkSession.sparkContext.appName
 
     val derivedXGBParamMap = MLlib2XGBoostParams
     var featuresColNames = derivedXGBParamMap.getOrElse("features_cols", Nil)
@@ -327,7 +329,7 @@ class XGBoostRegressionModel private[ml] (
         s"but found [${indices(0).map(schema.fieldNames).mkString(", ")}]!")
 
     val missing = getMissingValue
-    val resultRDD = dataset.mapColumnarBatchPerPartition((iter: Iterator[GpuColumnBatch]) => {
+    val resultRDD = PluginUtils.toColumnarRdd(dataFrame).mapPartitions((iter: Iterator[Table]) => {
       // call allocateGpuDevice to force assignment of GPU when in exclusive process mode
       // and pass that as the gpu_id, assumption is that if you are using CUDA_VISIBLE_DEVICES
       // it doesn't hurt to call allocateGpuDevice so just always do it.
@@ -337,8 +339,9 @@ class XGBoostRegressionModel private[ml] (
         gpuId = -1;
       }
 
+      val columnBatchIter = iter.map(new GpuColumnBatch(_, originalSchema))
       val ((dm, columnBatchToRow), time) = GpuDataset.time("Transform: build dmatrix and row") {
-        DataUtils.buildDMatrixIncrementally(gpuId, missing, indices, iter)
+        DataUtils.buildDMatrixIncrementally(gpuId, missing, indices, columnBatchIter)
       }
       logger.debug("Benchmark [Transform: Build Dmatrix and Row] " + time)
 
@@ -363,7 +366,7 @@ class XGBoostRegressionModel private[ml] (
     })
 
     bBooster.unpersist(blocking = false)
-    dataset.sparkSession.createDataFrame(resultRDD, generateResultSchema(schema))
+    dataFrame.sparkSession.createDataFrame(resultRDD, generateResultSchema(schema))
   }
 
   private def transformInternal(dataset: Dataset[_]): DataFrame = {
@@ -496,34 +499,18 @@ class XGBoostRegressionModel private[ml] (
     Array(originalPredictionItr, predLeafItr, predContribItr)
   }
 
-  def transform(dataset: GpuDataset): DataFrame = {
-    // Output selected columns only.
-    // This is a bit complicated since it tries to avoid repeated computation.
-    var outputData = transformInternal(dataset)
-    var numColsOutput = 0
-
-    val predictUDF = udf { (originalPrediction: mutable.WrappedArray[Float]) =>
-      originalPrediction(0).toDouble
-    }
-
-    if ($(predictionCol).nonEmpty) {
-      outputData = outputData
-        .withColumn($(predictionCol), predictUDF(col(_originalPredictionCol)))
-      numColsOutput += 1
-    }
-
-    if (numColsOutput == 0) {
-      this.logWarning(s"$uid: ProbabilisticClassificationModel.transform() was called as NOOP" +
-        " since no output columns were set.")
-    }
-    outputData.toDF.drop(col(_originalPredictionCol))
-  }
-
   override def transform(dataset: Dataset[_]): DataFrame = {
-    transformSchema(dataset.schema, logging = true)
+    val isSupportColumnar = PluginUtils.isSupportColumnar
+    if (!isSupportColumnar) {
+      transformSchema(dataset.schema, logging = true)
+    }
     // Output selected columns only.
     // This is a bit complicated since it tries to avoid repeated computation.
-    var outputData = transformInternal(dataset)
+    var outputData = if (isSupportColumnar) {
+      transformInternalHonorGpu(dataset.asInstanceOf[DataFrame])
+    } else {
+      transformInternal(dataset)
+    }
     var numColsOutput = 0
 
     val predictUDF = udf { (originalPrediction: mutable.WrappedArray[Float]) =>
