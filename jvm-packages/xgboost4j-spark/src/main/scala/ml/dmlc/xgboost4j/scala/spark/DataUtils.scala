@@ -18,13 +18,13 @@ package ml.dmlc.xgboost4j.scala.spark
 
 import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 import ml.dmlc.xgboost4j.scala.DMatrix
-import ml.dmlc.xgboost4j.scala.spark.rapids.ColumnBatchToRow
+import ml.dmlc.xgboost4j.scala.spark.rapids.{ColumnBatchToRow, PluginUtils}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.spark.ml.feature.{LabeledPoint => MLLabeledPoint}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Column, DataFrame, Row}
-import org.apache.spark.sql.types.{FloatType, IntegerType}
+import org.apache.spark.sql.types.{FloatType, IntegerType, StructType}
 
 object DataUtils extends Serializable {
   private[spark] implicit class XGBLabeledPointFeatures(
@@ -132,4 +132,32 @@ object DataUtils extends Serializable {
     (dm, columnBatchToRow)
   }
 
+  // called by classifier or regressor
+  private[spark] def buildGDFColumnData(
+      featuresColNames: Seq[String],
+      labelColName: String,
+      weightColName: String,
+      groupColName: String,
+      dataFrame: DataFrame): GDFColumnData = {
+    require(featuresColNames.nonEmpty, "No features column is specified!")
+    require(labelColName != null && labelColName.nonEmpty, "No label column is specified!")
+    val weightAndGroupName = Seq(weightColName, groupColName).map(
+      name => if (name == null || name.isEmpty) Array.empty[String] else Array(name)
+    )
+    // Seq in this order: features, label, weight, group
+    val colNames = Seq(featuresColNames.toArray, Array(labelColName)) ++ weightAndGroupName
+    // build column indices
+    val schema = dataFrame.schema
+    val indices = colNames.map(_.filter(schema.fieldNames.contains).map(schema.fieldIndex))
+    require(indices(0).length == featuresColNames.length,
+      "Features column(s) in schema do NOT match the one(s) in parameters. " +
+        s"Expect [${featuresColNames.mkString(", ")}], " +
+        s"but found [${indices(0).map(schema.fieldNames).mkString(", ")}]!")
+    require(indices(1).nonEmpty, "Missing label column in schema!")
+    // Check if has group
+    if (colNames(3).nonEmpty) {
+      require(indices(3).nonEmpty, "Can not find group column in schema!")
+    }
+    GDFColumnData(PluginUtils.toColumnarRdd(dataFrame), indices)
+  }
 }
