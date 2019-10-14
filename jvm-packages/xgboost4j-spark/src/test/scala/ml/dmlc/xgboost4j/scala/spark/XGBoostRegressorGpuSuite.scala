@@ -43,7 +43,7 @@ class XGBoostRegressorGpuSuite extends FunSuite with PerTest {
     assert(regressor.getFeaturesCols.contains("gdfCol2"))
     assert(regressor.getFeaturesCols.length == 2)
   }
-
+/*
   test("GPU Regression test the overloaded 'fit' should work with GpuDataset") {
     val paramMap = Map(
       "silent" -> 1,
@@ -331,4 +331,5 @@ class XGBoostRegressorGpuSuite extends FunSuite with PerTest {
     val prediction = model.transform(testDF).collect()
     assert(testRowCount === prediction.length)
   }
+*/
 }

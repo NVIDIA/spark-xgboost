@@ -43,7 +43,7 @@ class XGBoostClassifierGpuSuite extends FunSuite with PerTest {
     assert(classifier.getFeaturesCols.contains("gdfCol2"))
     assert(classifier.getFeaturesCols.length == 2)
   }
-
+/*
   test("test XGBoost-Spark XGBoostClassifier wrong num_class checking") {
     val paramMap = Map(
       "silent" -> 1,
@@ -407,4 +407,5 @@ class XGBoostClassifierGpuSuite extends FunSuite with PerTest {
     assert(resultDF.columns.contains("predictLeaf"))
     assert(resultDF.columns.contains("predictContrib"))
   }
+*/
 }

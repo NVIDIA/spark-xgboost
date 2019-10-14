@@ -19,7 +19,7 @@ package ml.dmlc.xgboost4j.scala.spark
 import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 import ml.dmlc.xgboost4j.java.{Rabit, XGBoostSparkJNI}
 import ml.dmlc.xgboost4j.scala.spark.params._
-import ml.dmlc.xgboost4j.scala.spark.rapids.{ColumnBatchToRow, GpuDataset}
+import ml.dmlc.xgboost4j.scala.spark.rapids.{ColumnBatchToRow, GpuDataset, PluginUtils}
 import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, EvalTrait, ObjectiveTrait, XGBoost => SXGBoost}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.commons.logging.LogFactory
@@ -174,66 +174,84 @@ class XGBoostClassifier (
       set(objectiveType, "classification")
     }
 
-    val _numClasses = getNumClasses(dataset)
-    if (isDefined(numClass) && $(numClass) != _numClasses) {
-      throw new Exception("The number of classes in dataset doesn't match " +
-        "\'num_class\' in xgboost params.")
-    }
-
-    val weight = if (!isDefined(weightCol) || $(weightCol).isEmpty) lit(1.0) else col($(weightCol))
-    val baseMargin = if (!isDefined(baseMarginCol) || $(baseMarginCol).isEmpty) {
-      lit(Float.NaN)
+    val (numClasses, booster, metrics) = if (PluginUtils.isSupportColumnar) {
+      // Spark plugin for GPU is loaded, go into GPU pipeline
+      trainHonorGpu(dataset.asInstanceOf[DataFrame])
     } else {
-      col($(baseMarginCol))
+      // Others fallback to CPU pipeline
+
+      val _numClasses = getNumClasses(dataset)
+      if (isDefined(numClass) && $(numClass) != _numClasses) {
+        throw new Exception("The number of classes in dataset doesn't match " +
+          "\'num_class\' in xgboost params.")
+      }
+
+      val weight = if (!isDefined(weightCol) || $(weightCol).isEmpty) lit(1.0)
+                   else col($(weightCol))
+      val baseMargin = if (!isDefined(baseMarginCol) || $(baseMarginCol).isEmpty) {
+        lit(Float.NaN)
+      } else {
+        col($(baseMarginCol))
+      }
+
+      val trainingSet: RDD[XGBLabeledPoint] = DataUtils.convertDataFrameToXGBLabeledPointRDDs(
+        col($(labelCol)), col($(featuresCol)), weight, baseMargin,
+        None, dataset.asInstanceOf[DataFrame]).head
+      val evalRDDMap = getEvalSets(xgboostParams).map {
+        case (name, dataFrame) => (name,
+          DataUtils.convertDataFrameToXGBLabeledPointRDDs(col($(labelCol)), col($(featuresCol)),
+            weight, baseMargin, None, dataFrame).head)
+      }
+      transformSchema(dataset.schema, logging = true)
+      val derivedXGBParamMap = MLlib2XGBoostParams
+      // All non-null param maps in XGBoostClassifier are in derivedXGBParamMap.
+      val (_booster, _metrics) = XGBoost.trainDistributed(trainingSet, derivedXGBParamMap,
+        hasGroup = false, evalRDDMap)
+      (_numClasses, _booster, _metrics)
     }
 
-    val trainingSet: RDD[XGBLabeledPoint] = DataUtils.convertDataFrameToXGBLabeledPointRDDs(
-      col($(labelCol)), col($(featuresCol)), weight, baseMargin,
-      None, dataset.asInstanceOf[DataFrame]).head
-    val evalRDDMap = getEvalSets(xgboostParams).map {
-      case (name, dataFrame) => (name,
-        DataUtils.convertDataFrameToXGBLabeledPointRDDs(col($(labelCol)), col($(featuresCol)),
-          weight, baseMargin, None, dataFrame).head)
-    }
-    transformSchema(dataset.schema, logging = true)
-    val derivedXGBParamMap = MLlib2XGBoostParams
-    // All non-null param maps in XGBoostClassifier are in derivedXGBParamMap.
-    val (_booster, _metrics) = XGBoost.trainDistributed(trainingSet, derivedXGBParamMap,
-      hasGroup = false, evalRDDMap)
-    val model = new XGBoostClassificationModel(uid, _numClasses, _booster)
-    val summary = XGBoostTrainingSummary(_metrics)
+    val model = new XGBoostClassificationModel(uid, numClasses, booster)
+    val summary = XGBoostTrainingSummary(metrics)
     model.setSummary(summary)
     model
   }
 
-  override def copy(extra: ParamMap): XGBoostClassifier = defaultCopy(extra)
-
-  def fit(dataset: GpuDataset): XGBoostClassificationModel = {
-    if (!isDefined(evalMetric) || $(evalMetric).isEmpty) {
-      set(evalMetric, setupDefaultEvalMetric())
-    }
-    if (isDefined(customObj) && $(customObj) != null) {
-      set(objectiveType, "classification")
-    }
-
+  private def trainHonorGpu(columnarDF: DataFrame): (Int, Booster, Map[String, Array[Float]]) = {
+    // Check columns and build column data
     val weightColName = if (isDefined(weightCol)) $(weightCol) else null
-    val colNames = XGBoost.buildGDFColumnNames($(featuresCols), $(labelCol),
-      weightColName, null)
-    val derivedXGBParamMap = MLlib2XGBoostParams
-    val (_booster, _metrics) = XGBoost.trainDistributedForGpuDataset(dataset, colNames,
-      derivedXGBParamMap, getGpuEvalSets(xgboostParams), true)
-
-    // Alreadly moved numClass checking to executor end.
-    // Here we just keep right for binary classification
-    var __numClass = 2
-    if (isDefined(numClass) && $(numClass) > 2) {
-      __numClass = $(numClass)
+    val columnData = DataUtils.buildGDFColumnData($(featuresCols), $(labelCol),
+      weightColName, null, columnarDF)
+    // eval map
+    val evalRDDMap = getEvalSets(xgboostParams).map {
+      case (name, df) => (name, DataUtils.buildGDFColumnData($(featuresCols), $(labelCol),
+        weightColName, null, df))
     }
-    val model = new XGBoostClassificationModel(uid, __numClass, _booster)
-    val summary = XGBoostTrainingSummary(_metrics)
-    model.setSummary(summary).setParent(this)
-    copyValues(model)
+    val derivedXGBParamMap = MLlib2XGBoostParams
+    val (_booster, _metrics) = XGBoost.trainDistributedPreferGpu(columnData,
+      derivedXGBParamMap, evalRDDMap, true)
+
+    // Already moved numClass checking to executor end.
+    // Here we just keep right for binary classification
+    var _numClass = 2
+    if (isDefined(numClass) && $(numClass) > 2) {
+      _numClass = $(numClass)
+    }
+    (_numClass, _booster, _metrics)
   }
+
+  protected override def validateAndTransformSchema(
+      schema: StructType,
+      fitting: Boolean,
+      featuresDataType: DataType): StructType = {
+    if (PluginUtils.isSupportColumnar) {
+      // Bypass the column check for GPU pipeline
+      schema
+    } else {
+      super.validateAndTransformSchema(schema, fitting, featuresDataType)
+    }
+  }
+
+  override def copy(extra: ParamMap): XGBoostClassifier = defaultCopy(extra)
 }
 
 object XGBoostClassifier extends DefaultParamsReadable[XGBoostClassifier] {
