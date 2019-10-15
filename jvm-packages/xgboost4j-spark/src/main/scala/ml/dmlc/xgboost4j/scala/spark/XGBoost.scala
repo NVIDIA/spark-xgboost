@@ -480,11 +480,15 @@ object XGBoost extends Serializable {
     }
     (evalSetsMap + (trainName -> trainingData)).map {
       case (name, colData) =>
-        if (colData.rawRDD.getNumPartitions != nWorkers) {
-          val newColumnarRDD = colData.rawRDD.coalesce(nWorkers)
-          name -> GDFColumnData(newColumnarRDD, colData.colsIndices)
-        } else {
+        val curNumberPartitions = colData.rawRDD.getNumPartitions
+        if (curNumberPartitions > nWorkers) {
+          name -> GDFColumnData(colData.rawRDD.coalesce(nWorkers), colData.colsIndices)
+        } else if (curNumberPartitions == nWorkers) {
           name -> colData
+        } else {
+          throw new IllegalArgumentException(s"Can NOT repartition from $curNumberPartitions to " +
+            s"$nWorkers since GPU doesn't support shuffle repartition. Please change spark " +
+            s"configs to have more partitions (>= $nWorkers) initialized after data loaded.")
         }
     }
   }
