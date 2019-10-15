@@ -481,7 +481,7 @@ object XGBoost extends Serializable {
     (evalSetsMap + (trainName -> trainingData)).map {
       case (name, colData) =>
         if (colData.rawRDD.getNumPartitions != nWorkers) {
-          val newColumnarRDD = colData.rawRDD.repartition(nWorkers)
+          val newColumnarRDD = colData.rawRDD.coalesce(nWorkers)
           name -> GDFColumnData(newColumnarRDD, colData.colsIndices)
         } else {
           name -> colData
