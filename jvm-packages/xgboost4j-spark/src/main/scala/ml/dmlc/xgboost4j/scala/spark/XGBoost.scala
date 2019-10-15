@@ -479,9 +479,12 @@ object XGBoost extends Serializable {
     }
     (evalSetsMap + (trainName -> trainingData)).map {
       case (name, colData) =>
-        // FIXME Do repartition only when nWorkers != rdd.getNumPartitions
-        val newColumnarRDD = colData.rawRDD.repartition(nWorkers)
-        name -> GDFColumnData(newColumnarRDD, colData.colsIndices)
+        if (colData.rawRDD.getNumPartitions != nWorkers) {
+          val newColumnarRDD = colData.rawRDD.repartition(nWorkers)
+          name -> GDFColumnData(newColumnarRDD, colData.colsIndices)
+        } else {
+          (name, colData)
+        }
     }
   }
 
