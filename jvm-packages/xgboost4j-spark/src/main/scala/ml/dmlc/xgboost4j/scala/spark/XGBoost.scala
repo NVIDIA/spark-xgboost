@@ -872,7 +872,10 @@ private object Watches {
 
     var max: Double = Double.MinValue
     // WAR to fix rmm not initialized issue for cuDF 0.10
-    if (!Rmm.isInitialized) Rmm.initialize(RmmAllocationMode.CUDA_DEFAULT, false, -1)
+    val shutdownRMM = if (!Rmm.isInitialized) {
+      Rmm.initialize(RmmAllocationMode.CUDA_DEFAULT, false, -1)
+      true
+    } else false
     while (iter.hasNext) {
       val table = iter.next()
 
@@ -936,7 +939,7 @@ private object Watches {
       table.close
     }
     // WAR to fix rmm not initialized issue for cuDF 0.10
-    if (Rmm.isInitialized) Rmm.shutdown()
+    if (shutdownRMM) Rmm.shutdown()
     logger.debug("Num class: " + max)
     if (dm != null && isLtr) {
       dm.setGroup(groupInfo)
