@@ -483,7 +483,7 @@ object XGBoost extends Serializable {
           val newColumnarRDD = colData.rawRDD.repartition(nWorkers)
           name -> GDFColumnData(newColumnarRDD, colData.colsIndices)
         } else {
-          (name, colData)
+          name -> colData
         }
     }
   }
