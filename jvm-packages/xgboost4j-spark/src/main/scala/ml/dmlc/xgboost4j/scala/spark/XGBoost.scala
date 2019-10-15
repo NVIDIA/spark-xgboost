@@ -20,6 +20,7 @@ import java.io.File
 import java.nio.file.Files
 
 import ai.rapids.cudf.Table
+import ai.rapids.cudf.{Rmm, RmmAllocationMode}
 
 import scala.collection.{AbstractIterator, mutable}
 import scala.util.Random
@@ -480,7 +481,7 @@ object XGBoost extends Serializable {
     (evalSetsMap + (trainName -> trainingData)).map {
       case (name, colData) =>
         if (colData.rawRDD.getNumPartitions != nWorkers) {
-          val newColumnarRDD = colData.rawRDD.repartition(nWorkers)
+          val newColumnarRDD = colData.rawRDD.coalesce(nWorkers)
           name -> GDFColumnData(newColumnarRDD, colData.colsIndices)
         } else {
           name -> colData
@@ -870,6 +871,11 @@ private object Watches {
     var isLtr = false
 
     var max: Double = Double.MinValue
+    // WAR to fix rmm not initialized issue for cuDF 0.10
+    val shutdownRMM = if (!Rmm.isInitialized) {
+      Rmm.initialize(RmmAllocationMode.CUDA_DEFAULT, false, -1)
+      true
+    } else false
     while (iter.hasNext) {
       val table = iter.next()
 
@@ -932,6 +938,8 @@ private object Watches {
       // Close the table
       table.close
     }
+    // WAR to fix rmm not initialized issue for cuDF 0.10
+    if (shutdownRMM) Rmm.shutdown()
     logger.debug("Num class: " + max)
     if (dm != null && isLtr) {
       dm.setGroup(groupInfo)

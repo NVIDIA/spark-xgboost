@@ -59,6 +59,7 @@ public class GpuColumnBatchTest {
   @Before
   public void setup() {
     assumeTrue(Cuda.isEnvCompatibleForTesting());
+    Rmm.initialize(RmmAllocationMode.CUDA_DEFAULT, false, -1);
     mTestTable = Table.readCSV(CUDF_SCHEMA, Paths.get(TEST_CSV_PATH).toFile());
   }
 
@@ -66,6 +67,7 @@ public class GpuColumnBatchTest {
   public void tearDown() {
     mTestTable.close();
     mTestTable = null;
+    Rmm.shutdown();
   }
 
   @Test
