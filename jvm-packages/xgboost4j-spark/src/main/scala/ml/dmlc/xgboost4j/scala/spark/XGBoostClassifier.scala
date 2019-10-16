@@ -16,7 +16,7 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
-import ai.rapids.cudf.Table
+import ai.rapids.cudf.{Rmm, RmmAllocationMode, Table}
 import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 import ml.dmlc.xgboost4j.java.{Rabit, XGBoostSparkJNI}
 import ml.dmlc.xgboost4j.scala.spark.params._
@@ -27,7 +27,6 @@ import org.apache.commons.logging.LogFactory
 import org.apache.hadoop.fs.Path
 import org.apache.spark.TaskContext
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.ml.attribute._
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.linalg._
 import org.apache.spark.ml.param._
@@ -351,34 +350,28 @@ class XGBoostClassificationModel private[ml](
     val bBooster = dataFrame.sparkSession.sparkContext.broadcast(_booster)
     val appName = dataFrame.sparkSession.sparkContext.appName
 
-    val derivedXGBParamMap = MLlib2XGBoostParams
-    var featuresColNames = derivedXGBParamMap.getOrElse("features_cols", Nil)
-      .asInstanceOf[Seq[String]]
-
-    val indices = Seq(featuresColNames.toArray).map(
-      _.filter(schema.fieldNames.contains).map(schema.fieldIndex)
-    )
-
-    require(indices(0).length == featuresColNames.length,
+    val featureIndices = $(featuresCols).filter(originalSchema.fieldNames.contains)
+      .map(originalSchema.fieldIndex)
+    require(featureIndices.length == $(featuresCols).length,
       "Features column(s) in schema do NOT match the one(s) in parameters. " +
-        s"Expect [${featuresColNames.mkString(", ")}], " +
-        s"but found [${indices(0).map(schema.fieldNames).mkString(", ")}]!")
+        s"Expect [${$(featuresCols).mkString(", ")}], " +
+        s"but found [${featureIndices.map(originalSchema.fieldNames).mkString(", ")}]!")
 
     val missing = getMissingValue
-
     val resultRDD = PluginUtils.toColumnarRdd(dataFrame).mapPartitions((iter: Iterator[Table]) => {
+      // WAR to fix rmm not initialized issue for cuDF 0.10
+      if (!Rmm.isInitialized) Rmm.initialize(RmmAllocationMode.CUDA_DEFAULT, false, -1)
+
       // call allocateGpuDevice to force assignment of GPU when in exclusive process mode
       // and pass that as the gpu_id, assumption is that if you are using CUDA_VISIBLE_DEVICES
       // it doesn't hurt to call allocateGpuDevice so just always do it.
       var gpuId = XGBoostSparkJNI.allocateGpuDevice()
-      logger.info("XGboost transformGPUDataSet using device: " + gpuId)
-      if (gpuId == 0) {
-        gpuId = -1;
-      }
+      logger.info("XGboost transform GPU pipeline using device: " + gpuId)
+      if (gpuId == 0) gpuId = -1
 
       val columnBatchIter = iter.map(new GpuColumnBatch(_, originalSchema))
       val ((dm, columnBatchToRow), time) = GpuDataset.time("Transform: build dmatrix and row") {
-        DataUtils.buildDMatrixIncrementally(gpuId, missing, indices, columnBatchIter)
+        DataUtils.buildDMatrixIncrementally(gpuId, missing, featureIndices, columnBatchIter)
       }
       logger.debug("Benchmark [Transform: Build Dmatrix and Row] " + time)
 
