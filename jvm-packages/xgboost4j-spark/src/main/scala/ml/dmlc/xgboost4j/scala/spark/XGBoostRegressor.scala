@@ -24,7 +24,7 @@ import scala.collection.JavaConverters._
 import ml.dmlc.xgboost4j.java.{Rabit, XGBoostSparkJNI}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import ml.dmlc.xgboost4j.scala.spark.params.{DefaultXGBoostParamsReader, _}
-import ml.dmlc.xgboost4j.scala.spark.rapids.{ColumnBatchToRow, GpuDataset, PluginUtils}
+import ml.dmlc.xgboost4j.scala.spark.rapids.PluginUtils
 import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, XGBoost => SXGBoost}
 import ml.dmlc.xgboost4j.scala.{EvalTrait, ObjectiveTrait}
 import org.apache.commons.logging.LogFactory
@@ -335,7 +335,7 @@ class XGBoostRegressionModel private[ml] (
       if (gpuId == 0) gpuId = -1
 
       val columnBatchIter = iter.map(new GpuColumnBatch(_, originalSchema))
-      val ((dm, columnBatchToRow), time) = GpuDataset.time("Transform: build dmatrix and row") {
+      val ((dm, columnBatchToRow), time) = PluginUtils.time("Transform: build dmatrix and row") {
         DataUtils.buildDMatrixIncrementally(gpuId, missing, featureIndices, columnBatchIter)
       }
       logger.debug("Benchmark [Transform: Build Dmatrix and Row] " + time)

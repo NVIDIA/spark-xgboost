@@ -16,7 +16,6 @@
 
 package ml.dmlc.xgboost4j.scala.spark.params
 
-import ml.dmlc.xgboost4j.scala.spark.rapids.GpuDataset
 import org.apache.spark.sql.DataFrame
 
 trait NonParamVariables {
@@ -41,26 +40,4 @@ trait NonParamVariables {
     evalDFs
   }
 
-  def getGpuEvalSets(params: Map[String, Any]): Map[String, GpuDataset] = {
-    // To minimize the change in apps, we use the same "eval_sets" with cpu.
-    // Then NO code change is needed for the eval parameter part, just get the eval
-    // sets as GpuDataset.
-    val evalGDSs = if (params.contains(KEY_EVAL_SETS)) {
-      params(KEY_EVAL_SETS).asInstanceOf[Map[String, GpuDataset]]
-    } else {
-      evalSetsMap.asInstanceOf[Map[String, GpuDataset]]
-    }
-    // Do type check for value entry here because the `asInstanceOf` just checks the first
-    // layer: Map, even specifying the types for both key and value.
-    require(evalGDSs.values.forall(_.isInstanceOf[GpuDataset]),
-      "Wrong type for value! Evaluation sets should be Map(name: String -> GpuDataset) for GPU.")
-    evalGDSs
-  }
-
-  // Use setEvalSets instead
-  @Deprecated
-  def setGpuEvalSets(evalSets: Map[String, GpuDataset]): this.type = {
-    evalSetsMap = evalSets
-    this
-  }
 }

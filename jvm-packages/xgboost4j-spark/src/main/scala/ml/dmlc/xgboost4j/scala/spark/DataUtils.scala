@@ -24,7 +24,7 @@ import org.apache.spark.ml.feature.{LabeledPoint => MLLabeledPoint}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Column, DataFrame, Row}
-import org.apache.spark.sql.types.{FloatType, IntegerType, StructType}
+import org.apache.spark.sql.types.{FloatType, IntegerType}
 
 object DataUtils extends Serializable {
   private[spark] implicit class XGBLabeledPointFeatures(

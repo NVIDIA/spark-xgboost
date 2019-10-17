@@ -20,7 +20,6 @@ import java.io.File
 
 import ai.rapids.cudf.{DType, Table}
 import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
-import ml.dmlc.xgboost4j.scala.spark.rapids.{GpuDataReader, GpuDataset}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{
   BooleanType, ByteType, DataType, DateType, DoubleType,
@@ -37,7 +36,7 @@ object GpuDatasetData {
     StructField("petal length", FloatType),
     StructField("petal width", FloatType),
     StructField("classIndex", FloatType)))
-
+/*
   def getClassifierTrainGpuDataset(spark: SparkSession): GpuDataset = {
     getTrainGpuDataset(spark, classifierSchema, classifierTrainDataPath)
   }
@@ -45,7 +44,7 @@ object GpuDatasetData {
   def getClassifierTestGpuDataset(spark: SparkSession): (GpuDataset, Long) = {
     getTestGpuDataset(spark, classifierSchema, classifierTestDataPath)
   }
-
+*/
   private val regressionTrainDataPath = "/norank.train.csv"
   private val regressionTestDataPath = "/norank.train.csv"
   private val regressionSchema = new StructType(Array(
@@ -53,7 +52,7 @@ object GpuDatasetData {
     StructField("c", DoubleType),
     StructField("d", DoubleType),
     StructField("e", DoubleType)))
-
+/*
   def getRegressionTrainGpuDataset(spark: SparkSession): GpuDataset = {
     getTrainGpuDataset(spark, regressionSchema, regressionTrainDataPath)
   }
@@ -61,7 +60,7 @@ object GpuDatasetData {
   def getRegressionTestGpuDataset(spark: SparkSession): (GpuDataset, Long) = {
     getTestGpuDataset(spark, regressionSchema, regressionTestDataPath)
   }
-
+*/
   private val rankingTrainDataPath = "/rank.train.csv"
   private val rankingTestDataPath = "/rank.test.csv"
   private val rankingSchema = new StructType(Array(
@@ -70,7 +69,7 @@ object GpuDatasetData {
     StructField("c", FloatType),
     StructField("d", FloatType),
     StructField("group", IntegerType)))
-
+/*
   def getRankingTrainGpuDataset(spark: SparkSession): GpuDataset = {
     getTrainGpuDataset(spark, rankingSchema, rankingTrainDataPath)
   }
@@ -95,7 +94,7 @@ object GpuDatasetData {
 
     (test, counts(0)_2)
   }
-
+*/
   private def getColumns(file: String, schema: StructType, label: String):
   (Table, Array[Long], Array[Long]) = {
     val csvSchemaBuilder = ai.rapids.cudf.Schema.builder

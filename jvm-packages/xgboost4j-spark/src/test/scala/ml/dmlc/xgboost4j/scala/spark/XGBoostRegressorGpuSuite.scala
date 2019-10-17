@@ -16,7 +16,6 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
-import ml.dmlc.xgboost4j.scala.spark.rapids.GpuDataReader
 import ml.dmlc.xgboost4j.scala.{DMatrix, XGBoost => ScalaXGBoost}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.Row
