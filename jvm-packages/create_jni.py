@@ -116,6 +116,7 @@ if __name__ == "__main__":
     lib_path = "xgboost4j/src/main/resources/lib/" + cuda
     maybe_makedirs(lib_path)
     cp("../lib/" + library_name, lib_path)
+    cp("../lib/librmm.so", lib_path)
 
     print("copying pure-Python tracker")
     cp("../dmlc-core/tracker/dmlc_tracker/tracker.py",

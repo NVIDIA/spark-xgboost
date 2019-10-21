@@ -14,18 +14,32 @@
 # This module defines
 #  RMM_FOUND, whether RMM has been found
 #  RMM_INCLUDE_DIR, directory containing header
+#  RMM_LIBRARY, path of the library file "librmm.so"
 #
 # This module assumes that the user has already called find_package(CUDA)
 
 
 find_path(RMM_INCLUDE_DIR
   NAMES rmm/rmm.h
-  PATHS $ENV{RMM_ROOT}/include ${RMM_ROOT}/include ${CUDA_INCLUDE_DIRS} /usr/include)
+  HINTS $ENV{RMM_ROOT}/include
+        $ENV{CONDA_PREFIX}/include
+        ${RMM_ROOT}/include
+        ${CUDA_INCLUDE_DIRS})
+
+find_library(RMM_LIBRARY
+  NAMES rmm
+  HINTS $ENV{RMM_ROOT}/lib/
+        $ENV{CONDA_PREFIX}/lib
+        ${RMM_ROOT}/lib)
+
+message(STATUS "Using rmm library: ${RMM_LIBRARY}")
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(RMM DEFAULT_MSG
-                                  RMM_INCLUDE_DIR)
+                                  RMM_INCLUDE_DIR
+                                  RMM_LIBRARY)
 
 mark_as_advanced(
   RMM_INCLUDE_DIR
+  RMM_LIBRARY
 )
