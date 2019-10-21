@@ -28,13 +28,13 @@ import ml.dmlc.xgboost4j.java.{IRabitTracker, Rabit, XGBoostError, XGBoostSparkJ
 import ml.dmlc.xgboost4j.scala.rabit.RabitTracker
 import ml.dmlc.xgboost4j.scala.spark.params.BoosterParams
 import ml.dmlc.xgboost4j.scala.spark.params.LearningTaskParams
-import ml.dmlc.xgboost4j.scala.spark.rapids.GpuDataset
+import ml.dmlc.xgboost4j.scala.spark.rapids.PluginUtils
 import ml.dmlc.xgboost4j.scala.{XGBoost => SXGBoost, _}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.commons.io.FileUtils
 import org.apache.commons.logging.LogFactory
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkContext, SparkParallelismTracker, TaskContext, TaskFailedListener}
+import org.apache.spark.{SparkContext, SparkParallelismTracker, TaskContext}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.storage.StorageLevel
 
@@ -890,25 +890,7 @@ private object Watches {
       val (weightIndices, groupIndices) = (indices(2), indices(3))
       // Disable LTR now
       require(groupIndices.isEmpty, "Learning to rank currently is not supported.")
-/**
-      if (groupIndices.nonEmpty) {
 
-        isLtr = true
-        // It is learning to rank
-        logger.info("Learning to rank.")
-        // Build and set group info.
-        // Now native does not implement the GPU version for group information,
-        // so need to fallback to CPU version.
-        groupInfo = groupInfo ++ columnBatch.groupByColumnWithCountHost(groupIndices(0))
-        if (weightIndices.nonEmpty) {
-          val weightIdx = weightIndices(0)
-          weight_ = columnBatch.groupByColumnWithAggregation(groupIndices(0),
-            weightIdx.toInt, true)
-          require(weight_ != null,
-            "The instances in the same group have to be assigned with the same weight.")
-        }
-      }
-*/
       if (isFirstBunch) {
         isFirstBunch = false
         // Suppose gdf columns are given in this order: features, label, weight,
@@ -949,7 +931,7 @@ private object Watches {
   def buildWatches(cachedDirName: Option[String], gpuId: Int, missing: Float,
       indices: Seq[Array[Int]], iter: Iterator[Table],
       inferNumClass: Boolean = false): Watches = {
-    val ((dm, numClass), time) = GpuDataset.time("Train: Build DMatrix incrementally") {
+    val ((dm, numClass), time) = PluginUtils.time("Train: Build DMatrix incrementally") {
       buildDMatrixIncrementally(gpuId, missing, indices, iter, inferNumClass)
     }
     logger.debug("Benchmark[Train: Build DMatrix incrementally] " + time)
@@ -969,7 +951,7 @@ private object Watches {
     val dms = nameAndGdfColumns.map {
       case (name, iter) => (name, {
         val inferring = inferNumClass && name == "train"
-        val ((dm, tmpNumClass), time) = GpuDataset.time(s"Train: Build $name DMatrix") {
+        val ((dm, tmpNumClass), time) = PluginUtils.time(s"Train: Build $name DMatrix") {
           buildDMatrixIncrementally(gpuId, missing, indices(name), iter, inferring)
         }
         logger.debug(s"Benchmark[Train build $name DMatrix] " + time)
