@@ -20,7 +20,7 @@ stashJars(){
 
 ###### Preparation before build ######
 SIGN_FILE=$1
-BUILD_ARG="-DskipTests -Dmaven.repo.local=$WORKSPACE/.m2"
+BUILD_ARG="-DskipTests -Dmaven.repo.local=$WORKSPACE/.m2 -B"
 
 if [ "$SIGN_FILE" == true ]; then
     # Build javadoc and sources only when SIGN_JAR

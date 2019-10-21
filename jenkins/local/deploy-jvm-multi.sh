@@ -15,7 +15,7 @@ if [ "$SIGN_FILE" == true ]; then
 else
     DEPLOY_CMD="mvn deploy:deploy-file"
 fi
-DEPLOY_CMD="$DEPLOY_CMD -Durl=$SERVER_URL -DrepositoryId=$SERVER_ID"
+DEPLOY_CMD="$DEPLOY_CMD -Durl=$SERVER_URL -DrepositoryId=$SERVER_ID -B"
 echo "Deploy cmd: $DEPLOY_CMD"
 
 cd jvm-packages
