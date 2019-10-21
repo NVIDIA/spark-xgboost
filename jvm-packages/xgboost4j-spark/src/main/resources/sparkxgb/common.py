@@ -76,15 +76,10 @@ class XGboostEstimator(JavaEstimator, XGBoostReadable, JavaMLWritable, ParamGett
 
     def setEvalSets(self, eval_sets):
         if eval_sets:
-            is_data_frame = isinstance(list(eval_sets.values())[0], DataFrame)
             jvm_eval_sets = _jvm().PythonUtils.toScalaMap(
-                { k: v._jdf if is_data_frame else v._java_obj for k, v in eval_sets.items() })
+                { k: v._jdf for k, v in eval_sets.items() })
             self._java_obj.setEvalSets(jvm_eval_sets)
         return self
-
-    def fit(self, dataset):
-        dataset = dataset if isinstance(dataset, DataFrame) else dataset._java_obj
-        return super(XGboostEstimator, self).fit(dataset)
 
 
 class XGboostModel(JavaModel, XGBoostReadable, JavaMLWritable, ParamGettersSetters):
@@ -100,7 +95,3 @@ class XGboostModel(JavaModel, XGBoostReadable, JavaMLWritable, ParamGettersSette
         if java_model is not None:
             self._transfer_params_from_java()
         self._create_param_getters_and_setters()
-
-    def transform(self, dataset):
-        dataset = dataset if isinstance(dataset, DataFrame) else dataset._java_obj
-        return super(XGboostModel, self).transform(dataset)
