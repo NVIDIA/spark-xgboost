@@ -5,7 +5,6 @@ import os
 import shutil
 import subprocess
 import sys
-import re
 from contextlib import contextmanager
 
 
@@ -69,13 +68,6 @@ def normpath(path):
     else:
         return normalized
 
-def find_rmmlib(xgblib):
-    linkinfo = os.popen('ldd ' + xgblib).read()
-    ret = re.search(r'librmm\.so\s+=>\s+(.*librmm.*\.so)\s+.*', linkinfo)
-    if ret:
-        return ret.group(1)
-    else:
-        raise Exception("Can not find rmm library.")
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2 and sys.argv[1].lower() == "cuda9.2":
@@ -124,8 +116,7 @@ if __name__ == "__main__":
     lib_path = "xgboost4j/src/main/resources/lib/" + cuda
     maybe_makedirs(lib_path)
     cp("../lib/" + library_name, lib_path)
-    rmmlib = find_rmmlib(os.path.join(lib_path, library_name))
-    cp(rmmlib, lib_path)
+    cp("../lib/librmm.so", lib_path)
 
     print("copying pure-Python tracker")
     cp("../dmlc-core/tracker/dmlc_tracker/tracker.py",

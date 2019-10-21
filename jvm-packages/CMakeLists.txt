@@ -9,6 +9,9 @@ endif (USE_CUDF)
 add_library(rmm SHARED IMPORTED)
 set_target_properties(rmm PROPERTIES IMPORTED_LOCATION ${RMM_LIBRARY})
 
+# Copy rmm library to the directory placing xgboost4j for packing later.
+file(COPY ${RMM_LIBRARY} DESTINATION ${PROJECT_SOURCE_DIR}/lib)
+
 add_library(xgboost4j SHARED
   ${PROJECT_SOURCE_DIR}/jvm-packages/xgboost4j/src/native/xgboost4j.cpp
   ${PROJECT_SOURCE_DIR}/jvm-packages/xgboost4j-spark/src/native/xgboost4j_spark.cpp
