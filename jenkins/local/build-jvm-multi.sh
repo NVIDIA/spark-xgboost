@@ -1,7 +1,7 @@
 #!/bin/bash
 ##
 #
-# Script to build xgboost jar files.
+# Script to build xgboost jars for deployment
 #
 # Source tree is supposed to be ready by Jenkins
 # before starting this script.
@@ -9,40 +9,25 @@
 ###
 set -e
 gcc --version
-echo "Sign Jar?: $1"
 
-# Should be called under 'jvm-packages'
 stashJars(){
-    MODULE_OUT=$OUT/$1
-    mkdir -p $MODULE_OUT
-    cp -ft $MODULE_OUT $1/target/*.jar
+    MODULE_OUT=$OUT/$1 && mkdir -p $MODULE_OUT
+    cp -ft $MODULE_OUT $WORKSPACE/jvm-packages/$1/target/xgb*.jar
 }
 
-###### Preparation before build ######
-SIGN_FILE=$1
-BUILD_ARG="-DskipTests -Dmaven.repo.local=$WORKSPACE/.m2 -B"
+BUILD_MODULE=$WORKSPACE/jenkins/local/module-build-jvm.sh
+BUILD_ARG="-DskipTests -Dmaven.repo.local=$WORKSPACE/.m2"
 
+SIGN_FILE=$1 && echo "Sign Jar?: $SIGN_FILE"
 if [ "$SIGN_FILE" == true ]; then
     # Build javadoc and sources only when SIGN_JAR
     BUILD_ARG="$BUILD_ARG -Prelease-to-sonatype"
 fi
 
-###### Build jar and its libraries ######
-cd jvm-packages
-## 1) Build libxgboost4j.so for CUDA9.2 CUDA10.1
-rm -rf ../build
-. /opt/tools/to_cuda9.2.sh
-./create_jni.py cuda9.2
-rm -rf ../build
-. /opt/tools/to_cuda10.1.sh
-./create_jni.py cuda10.1
-## 2) Build libxgboost4j.so for CUDA10.0 and the jar file
-rm -rf ../build
-. /opt/tools/to_cuda10.0.sh
-mvn clean package $BUILD_ARG
+###### Build jars ##
+. $BUILD_MODULE $BUILD_ARG
 
-###### Stash jar files for modules ######
+###### Stash jars ##
 stashJars xgboost4j
 stashJars xgboost4j-spark
 
-cd ..

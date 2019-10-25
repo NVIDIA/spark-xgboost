@@ -10,19 +10,9 @@
 set -e
 gcc --version
 
-#BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2 -Dcudf.classifier=cuda10-centos7"
 BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2 -Dcudf.classifier=cuda10 -DskipTests"
+BUILD_MODULE=$WORKSPACE/jenkins/local/module-build-jvm.sh
+. $BUILD_MODULE "deploy $BUILD_ARG"
 
-cd jvm-packages
-. /opt/tools/to_cuda9.2.sh
-rm -rf ../build
-./create_jni.py cuda9.2
-. /opt/tools/to_cuda10.1.sh
-rm -rf ../build
-./create_jni.py cuda10.1
-. /opt/tools/to_cuda10.0.sh
-rm -rf ../build
-mvn $BUILD_ARG clean package deploy
 
-cd ..
 
