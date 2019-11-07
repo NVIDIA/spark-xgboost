@@ -21,7 +21,7 @@ BUILD_ARG="-DskipTests -Dmaven.repo.local=$WORKSPACE/.m2"
 SIGN_FILE=$1 && echo "Sign Jar?: $SIGN_FILE"
 if [ "$SIGN_FILE" == true ]; then
     # Build javadoc and sources only when SIGN_JAR
-    BUILD_ARG="$BUILD_ARG -Prelease-to-sonatype"
+    BUILD_ARG="$BUILD_ARG -s settings.xml -Prelease-to-sonatype,sonatype-stage"
 fi
 
 ###### Build jars ##
