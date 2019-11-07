@@ -31,7 +31,7 @@ class NativeLibLoader {
 
   private static boolean initialized = false;
   private static final String nativeResourcePath = "/lib/";
-  private static final String[] libNames = new String[]{"rmm", "xgboost4j"};
+  private static final String[] libNames = new String[]{"xgboost4j"};
 
   static synchronized void initXGBoost() throws IOException {
     if (!initialized) {
