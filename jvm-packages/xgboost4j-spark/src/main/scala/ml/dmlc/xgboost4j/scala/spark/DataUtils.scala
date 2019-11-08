@@ -16,6 +16,7 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
+import ai.rapids.cudf.Table
 import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 import ml.dmlc.xgboost4j.scala.DMatrix
 import ml.dmlc.xgboost4j.scala.spark.rapids.{ColumnBatchToRow, PluginUtils}
@@ -24,7 +25,7 @@ import org.apache.spark.ml.feature.{LabeledPoint => MLLabeledPoint}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Column, DataFrame, Row}
-import org.apache.spark.sql.types.{FloatType, IntegerType}
+import org.apache.spark.sql.types.{FloatType, IntegerType, StructType}
 
 object DataUtils extends Serializable {
   private[spark] implicit class XGBLabeledPointFeatures(
@@ -107,13 +108,16 @@ object DataUtils extends Serializable {
   }
 
   private[spark] def buildDMatrixIncrementally(gpuId: Int, missing: Float,
-      featureIndices: Seq[Int], iter: Iterator[GpuColumnBatch]): (DMatrix, ColumnBatchToRow) = {
+      featureIndices: Seq[Int], iter: Iterator[Table],
+      schema: StructType): (DMatrix, ColumnBatchToRow) = {
+
     var dm: DMatrix = null
     var isFirstBatch = true
     val columnBatchToRow: ColumnBatchToRow = new ColumnBatchToRow
 
     while (iter.hasNext) {
-      val columnBatch = iter.next()
+      val table = iter.next()
+      val columnBatch = new GpuColumnBatch(table, schema)
       val features_ = Array(featureIndices.map(columnBatch.getColumn): _*)
       if (isFirstBatch) {
         isFirstBatch = false
@@ -122,6 +126,7 @@ object DataUtils extends Serializable {
         dm.appendCUDF(features_)
       }
       columnBatchToRow.appendColumnBatch(columnBatch)
+      table.close()
     }
     if (dm == null) {
       // here we allow empty iter
