@@ -334,9 +334,8 @@ class XGBoostRegressionModel private[ml] (
       logger.info("XGboost regressor transform GPU pipeline using device: " + gpuId)
       if (gpuId == 0) gpuId = -1
 
-      val columnBatchIter = iter.map(new GpuColumnBatch(_, originalSchema))
       val ((dm, columnBatchToRow), time) = PluginUtils.time("Transform: build dmatrix and row") {
-        DataUtils.buildDMatrixIncrementally(gpuId, missing, featureIndices, columnBatchIter)
+        DataUtils.buildDMatrixIncrementally(gpuId, missing, featureIndices, iter, originalSchema)
       }
       logger.debug("Benchmark [Transform: Build Dmatrix and Row] " + time)
 
