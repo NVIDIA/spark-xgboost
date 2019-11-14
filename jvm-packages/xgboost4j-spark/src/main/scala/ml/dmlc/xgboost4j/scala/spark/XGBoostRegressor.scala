@@ -16,8 +16,7 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
-import ai.rapids.cudf.{Rmm, RmmAllocationMode, Table}
-import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
+import ai.rapids.cudf.Table
 
 import scala.collection.{AbstractIterator, Iterator, mutable}
 import scala.collection.JavaConverters._
@@ -324,8 +323,6 @@ class XGBoostRegressionModel private[ml] (
 
     val missing = getMissingValue
     val resultRDD = PluginUtils.toColumnarRdd(dataFrame).mapPartitions((iter: Iterator[Table]) => {
-      // WAR to fix rmm not initialized issue for cuDF 0.10
-      if (!Rmm.isInitialized) Rmm.initialize(RmmAllocationMode.CUDA_DEFAULT, false, -1)
 
       // call allocateGpuDevice to force assignment of GPU when in exclusive process mode
       // and pass that as the gpu_id, assumption is that if you are using CUDA_VISIBLE_DEVICES

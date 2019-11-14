@@ -18,12 +18,8 @@ package ml.dmlc.xgboost4j.java;
 
 import ai.rapids.cudf.ColumnVector;
 import ai.rapids.cudf.Cuda;
-import ai.rapids.cudf.Rmm;
-import ai.rapids.cudf.RmmAllocationMode;
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
 import org.apache.spark.unsafe.Platform;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -35,16 +31,6 @@ import static org.junit.Assume.assumeTrue;
  * Test cases for XGBoostSparkJNI
  */
 public class XGBoostSparkJNITest {
-
-  @Before
-  public void setup() {
-    Rmm.initialize(RmmAllocationMode.CUDA_DEFAULT, false, -1);
-  }
-
-  @After
-  public void clear() {
-    Rmm.shutdown();
-  }
 
   @Test
   public void testSimpleBuildUnsafeRows() {
