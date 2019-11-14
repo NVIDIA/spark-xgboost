@@ -20,7 +20,6 @@ import java.io.File
 import java.nio.file.Files
 
 import ai.rapids.cudf.Table
-import ai.rapids.cudf.{Rmm, RmmAllocationMode}
 
 import scala.collection.{AbstractIterator, mutable}
 import scala.util.Random
@@ -875,8 +874,6 @@ private object Watches {
     var isLtr = false
 
     var max: Double = Double.MinValue
-    // WAR to fix rmm not initialized issue for cuDF 0.10
-    if (!Rmm.isInitialized) Rmm.initialize(RmmAllocationMode.CUDA_DEFAULT, false, -1)
     while (iter.hasNext) {
       val table = iter.next()
 

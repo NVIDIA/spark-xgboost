@@ -18,12 +18,7 @@ package ml.dmlc.xgboost4j.java;
 import ai.rapids.cudf.ColumnVector;
 import ai.rapids.cudf.Cuda;
 
-import ai.rapids.cudf.Rmm;
-import ai.rapids.cudf.RmmAllocationMode;
 import junit.framework.TestCase;
-
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -36,16 +31,6 @@ import static org.junit.Assume.assumeTrue;
  * @author liangcail
  */
 public class DMatrixForCUDFTest {
-
-  @Before
-  public void setup() {
-    Rmm.initialize(RmmAllocationMode.CUDA_DEFAULT, false, -1);
-  }
-
-  @After
-  public void clear() {
-    Rmm.shutdown();
-  }
 
   @Test
   public void testCreateFromCUDF() {
