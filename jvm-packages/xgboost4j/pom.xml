@@ -36,7 +36,7 @@
             <artifactId>cudf</artifactId>
             <version>${cudf.version}</version>
             <classifier>${cudf.classifier}</classifier>
-            <scope>test</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
