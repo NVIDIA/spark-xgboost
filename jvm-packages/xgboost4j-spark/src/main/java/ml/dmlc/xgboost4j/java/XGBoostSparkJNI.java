@@ -16,7 +16,7 @@
 
 package ml.dmlc.xgboost4j.java;
 
-import ai.rapids.cudf.Cuda;
+import ai.rapids.cudf.NativeDepsLoader;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -28,6 +28,9 @@ public class XGBoostSparkJNI {
 
   static {
     try {
+      logger.info("load cuDF libs");
+      NativeDepsLoader.libraryLoaded();
+      logger.info("load XGBoost libs");
       NativeLibLoader.initXGBoost();
     } catch (Exception ex) {
       logger.error("Failed to load native library", ex);
