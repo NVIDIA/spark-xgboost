@@ -35,7 +35,7 @@ node('docker-deploy') {
         sh "rm -rf $OUT"
 
         stage ('Build XGBoost on Centos7') {
-            def dockerImage = docker.build("xgb-build-centos7:cudf0.10",
+            def dockerImage = docker.build("xgb-build-centos7:cudf0.11",
                     "-f ${LOCAL_ROOT}/Dockerfile.centos7_build ${LOCAL_ROOT}")
             dockerImage.inside ('--runtime=nvidia') {
                 sh "scl enable devtoolset-7 '$BUILD_SCRIPT ${secInfo[3]}'"
@@ -48,7 +48,7 @@ node('docker-deploy') {
                 "SERVER_URL=${SERVERS_MAP[params.DEPLOY_SERVER]}",
                 'SERVER_ID=ossrh'
             ]) {
-                def dockerImage = docker.build("xgb-build-centos7:cudf0.10",
+                def dockerImage = docker.build("xgb-build-centos7:cudf0.11",
                         "-f ${LOCAL_ROOT}/Dockerfile.centos7_build ${LOCAL_ROOT}")
                 dockerImage.inside ('--runtime=nvidia -u root') {
                     withCredentials([

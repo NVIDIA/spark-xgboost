@@ -16,12 +16,12 @@ stashJars(){
 }
 
 BUILD_MODULE=$WORKSPACE/jenkins/local/module-build-jvm.sh
-BUILD_ARG="-DskipTests -Dmaven.repo.local=$WORKSPACE/.m2"
+BUILD_ARG="-DskipTests -Dmaven.repo.local=$WORKSPACE/.m2 -s settings.xml -Pmirror-apache-to-gpuwa"
 
 SIGN_FILE=$1 && echo "Sign Jar?: $SIGN_FILE"
 if [ "$SIGN_FILE" == true ]; then
     # Build javadoc and sources only when SIGN_JAR
-    BUILD_ARG="$BUILD_ARG -s settings.xml -Prelease-to-sonatype,sonatype-stage"
+    BUILD_ARG="$BUILD_ARG -Prelease-to-sonatype,sonatype-stage"
 fi
 
 ###### Build jars ##
