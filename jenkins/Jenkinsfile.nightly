@@ -33,6 +33,8 @@ pipeline {
         cron('H 0 * * *')
     }
 
+    environment { CUDF_VERSION='0.11'}
+
     // Build stages
     stages {
         stage('Jenkins: Get sources') {
@@ -52,8 +54,9 @@ pipeline {
                 unstash name: 'srcs'
                 script {
                     def dockerImage = docker.build(
-                        'xgboost-dev-centos7-build',
-                        '-f jenkins/local/Dockerfile.centos7_build jenkins/local')
+                        "xgboost-dev-centos7-build:cudf${CUDF_VERSION}",
+                        "-f jenkins/local/Dockerfile.centos7_build \
+                            --build-arg RAPIDS_VERSION=${CUDF_VERSION} jenkins/local")
                     dockerImage.inside('--runtime=nvidia -v /etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
                         sh 'scl enable devtoolset-7 jenkins/local/build-jvm-nightly.sh'
                     }
