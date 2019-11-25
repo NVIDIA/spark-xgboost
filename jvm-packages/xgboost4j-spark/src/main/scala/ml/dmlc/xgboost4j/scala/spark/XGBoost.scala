@@ -20,8 +20,10 @@ import java.io.File
 import java.nio.file.Files
 
 import ai.rapids.cudf.Table
+import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 
 import scala.collection.{AbstractIterator, mutable}
+import scala.collection.JavaConverters._
 import scala.util.Random
 import ml.dmlc.xgboost4j.java.{IRabitTracker, Rabit, XGBoostError, XGBoostSparkJNI, RabitTracker => PyRabitTracker}
 import ml.dmlc.xgboost4j.scala.rabit.RabitTracker
@@ -518,7 +520,7 @@ object XGBoost extends Serializable {
     val gpuId = XGBoostSparkJNI.allocateGpuDevice()
     logger.info("XGboost GPU training using device: " + gpuId)
     if (gpuId != 0) {
-      (gpuId, params + ("gpu_id" -> gpuId.toString()))
+      (gpuId, params + ("gpu_id" -> gpuId.toString))
     } else {
       (gpuId, params)
     }
@@ -860,6 +862,7 @@ private object Watches {
   }
 
   // ========= GPU Pipeline Begin =============
+  // Suppose "indices" are given in this order <features, label, weight, group>
   private def buildDMatrixIncrementally(gpuId: Int, missing: Float, indices: Seq[Array[Int]],
       iter: Iterator[Table], inferNumClass: Boolean = false): (DMatrix, Double) = {
 
@@ -871,36 +874,42 @@ private object Watches {
 
     var isFirstBunch = true
     var dm: DMatrix = null
-    var groupInfo: Array[Int] = Array()
-    var isLtr = false
+    val (weightIndices, groupIndices) = (indices(2), indices(3))
+    val hasWeight = weightIndices.nonEmpty
+    // For LTR
+    val groupInfo = new mutable.ArrayBuffer[java.lang.Integer]
+    val weightInfo = new mutable.ArrayBuffer[java.lang.Float]
+    var groupId = 0
+    val isLTR = groupIndices.nonEmpty
 
     var max: Double = Double.MinValue
     while (iter.hasNext) {
-      val table = iter.next()
+      val columnBatch = new GpuColumnBatch(iter.next(), null)
+      if (isLTR) {
+        // Build group info, along with weight info if needed (-1 means no weight)
+        val weightIdx = if (hasWeight) weightIndices(0) else -1
+        groupId = columnBatch.groupAndAggregateOnColumnsHost(groupIndices(0), weightIdx, groupId,
+          groupInfo.asJava, weightInfo.asJava)
+      }
 
-      // Suppose gdf column indices are given in this order <features, label, weight, group>,
-      // Pls refer to method 'DataUtils.buildGDFColumnData'.
-      // First transform indices to native handles for (features, label, weight)
-      val gdfColsHandles = indices.take(3).map(_.map(table.getColumn(_).getNativeCudfColumnAddress))
-
-      // Then set others (weight && group) as needed
-      var weight_ = gdfColsHandles(2)
-      val (weightIndices, groupIndices) = (indices(2), indices(3))
-      // Disable LTR now
-      require(groupIndices.isEmpty, "Learning to rank currently is not supported.")
-
+      // Transform indices to native handles for (features, label)
+      val gdfColsHandles = indices.take(2).map(_.map(columnBatch.getColumn))
+      val (features_, label_) = (gdfColsHandles.head, gdfColsHandles(1))
+      // Weight is set differently from LTR to non-LTR.
+      // GPU column handle is used for non-LTR, but cpu "Array[Float]" is used for LTR to support
+      // chunk loading.
+      val weight_ = if (isLTR) Array.emptyLongArray else weightIndices.map(columnBatch.getColumn)
+      // Build DMatrix
       if (isFirstBunch) {
         isFirstBunch = false
-        // Suppose gdf columns are given in this order: features, label, weight,
-        // the same with that in 'DataUtils.buildGDFColumnData'.
-        dm = new DMatrix(gdfColsHandles(0), gpuId, missingValue)
-        dm.setCUDFInfo("label", gdfColsHandles(1))
+        dm = new DMatrix(features_, gpuId, missingValue)
+        dm.setCUDFInfo("label", label_)
         if (weight_.nonEmpty) {
           dm.setCUDFInfo("weight", weight_)
         }
       } else {
-        dm.appendCUDF(gdfColsHandles(0))
-        dm.appendCUDFInfo("label", gdfColsHandles(1))
+        dm.appendCUDF(features_)
+        dm.appendCUDFInfo("label", label_)
         if (weight_.nonEmpty) {
           dm.appendCUDFInfo("weight", weight_)
         }
@@ -909,19 +918,22 @@ private object Watches {
       if (inferNumClass) {
         // calculate max label to reduce
         indices(1).foreach(index => {
-          val scalar = table.getColumn(index).max()
+          val scalar = columnBatch.getColumnVector(index).max
           if (scalar.isValid) {
             val tmp = scalar.getDouble
             max = if (max < tmp) tmp else max
           }
         })
       }
-      // Close the table
-      table.close
+      // Close the table(GpuColumnBatch)
+      columnBatch.close()
     }
     logger.debug("Num class: " + max)
-    if (dm != null && isLtr) {
-      dm.setGroup(groupInfo)
+    if (dm != null && isLTR) {
+      logger.info("Learning to rank.")
+      dm.setGroup(groupInfo.map(_.intValue).toArray)
+      // To support chunk loading, use CPU way to set weight info for LTR.
+      if (hasWeight) dm.setWeight(weightInfo.map(_.floatValue).toArray)
     }
     (dm, max)
   }
