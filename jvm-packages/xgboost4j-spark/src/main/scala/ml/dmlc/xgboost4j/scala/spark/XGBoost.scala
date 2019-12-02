@@ -477,7 +477,7 @@ object XGBoost extends Serializable {
     if (isCacheData) {
       logger.warn("Data cache is not support for Gpu pipeline!")
     }
-    (evalSetsMap + (trainName -> trainingData)).map {
+    (Map(trainName -> trainingData) ++ evalSetsMap).map {
       case (name, colData) =>
         val curNumberPartitions = colData.rawRDD.getNumPartitions
         if (curNumberPartitions > nWorkers) {
