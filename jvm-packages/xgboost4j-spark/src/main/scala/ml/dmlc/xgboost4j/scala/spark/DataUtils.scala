@@ -152,15 +152,15 @@ object DataUtils extends Serializable {
     // build column indices
     val schema = dataFrame.schema
     val indices = colNames.map(_.filter(schema.fieldNames.contains).map(schema.fieldIndex))
-    require(indices(0).length == featuresColNames.length,
+    require(indices.head.length == featuresColNames.length,
       "Features column(s) in schema do NOT match the one(s) in parameters. " +
         s"Expect [${featuresColNames.mkString(", ")}], " +
-        s"but found [${indices(0).map(schema.fieldNames).mkString(", ")}]!")
+        s"but found [${indices.head.map(schema.fieldNames).mkString(", ")}]!")
     require(indices(1).nonEmpty, "Missing label column in schema!")
     // Check if has group
     if (colNames(3).nonEmpty) {
       require(indices(3).nonEmpty, "Can not find group column in schema!")
     }
-    GDFColumnData(PluginUtils.toColumnarRdd(dataFrame), indices)
+    GDFColumnData(dataFrame, indices)
   }
 }

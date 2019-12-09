@@ -36,7 +36,7 @@ import org.apache.commons.io.FileUtils
 import org.apache.commons.logging.LogFactory
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkContext, SparkParallelismTracker, TaskContext}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 /**
@@ -71,8 +71,10 @@ private[spark] case class XGBLabeledPointGroup(
 
 // ========= GPU Pipeline Start =============
 private[spark] case class GDFColumnData(
-    rawRDD: RDD[Table],
-    colsIndices: Seq[Array[Int]])
+    rawDF: DataFrame,
+    colsIndices: Seq[Array[Int]]) {
+  def hasGroup: Boolean = (colsIndices.length == 4) && colsIndices(3).nonEmpty
+}
 // ========= GPU Pipeline End =============
 
 object XGBoost extends Serializable {
@@ -481,17 +483,8 @@ object XGBoost extends Serializable {
     }
     (Map(trainName -> trainingData) ++ evalSetsMap).map {
       case (name, colData) =>
-        val curNumberPartitions = colData.rawRDD.getNumPartitions
-        if (curNumberPartitions > nWorkers) {
-          name -> GDFColumnData(colData.rawRDD.coalesce(nWorkers), colData.colsIndices)
-        } else if (curNumberPartitions == nWorkers) {
-          name -> colData
-        } else {
-          throw new IllegalArgumentException(s"Can NOT repartition [$name] data from" +
-            s" $curNumberPartitions to $nWorkers since GPU doesn't support shuffle repartition." +
-            s" Please change spark configs to have more partitions (>= $nWorkers)" +
-            s" initialized after data loaded.")
-        }
+        // No low cost way to get number of partitions from DataFrame, so always repartition
+        name -> GDFColumnData(colData.rawDF.repartition(nWorkers), colData.colsIndices)
     }
   }
 
@@ -505,7 +498,7 @@ object XGBoost extends Serializable {
 
     dataMap.foldLeft(emptyDataRdd) {
       case (zippedRdd, (name, gdfColData)) =>
-        zippedRdd.zipPartitions(gdfColData.rawRDD) {
+        zippedRdd.zipPartitions(PluginUtils.toColumnarRdd(gdfColData.rawDF)) {
           (itWrapper, itTable) =>
             (itWrapper.toArray :+ (name -> itTable)).filter(x => x != null).toIterator
         }
@@ -544,7 +537,7 @@ object XGBoost extends Serializable {
     if (noEvalSet) {
       // Get the indices here at driver side to avoid passing the whole Map to executor(s)
       val colIndicesForTrain = dataMap(trainName).colsIndices
-      dataMap(trainName).rawRDD.mapPartitions({
+      PluginUtils.toColumnarRdd(dataMap(trainName).rawDF).mapPartitions({
         iter: Iterator[Table] =>
           val (gpuId, paramsWithGpuId) = appendGpuIdToParameters(updatedParams)
 
@@ -584,7 +577,7 @@ object XGBoost extends Serializable {
     // First check and get parameters.
     // Second prepare the training data and run training
     // Then setup checkpoint manager
-    val sc = trainingData.rawRDD.sparkContext
+    val sc = trainingData.rawDF.sparkSession.sparkContext
     val (nWorkers, round, _, _, _, _, trackerConf, timeoutRequestWorkers,
       checkpointPath, checkpointInterval) = parameterFetchAndValidation(params, sc)
     val dataMap = prepareDataForGpu(trainingData, evalSetsMap, nWorkers, params)
