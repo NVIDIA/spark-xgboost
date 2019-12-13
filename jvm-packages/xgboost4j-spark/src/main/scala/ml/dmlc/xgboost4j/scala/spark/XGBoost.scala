@@ -35,8 +35,9 @@ import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.commons.io.FileUtils
 import org.apache.commons.logging.LogFactory
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.{SparkContext, SparkParallelismTracker, TaskContext}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession, functions}
 import org.apache.spark.storage.StorageLevel
 
 /**
@@ -72,9 +73,8 @@ private[spark] case class XGBLabeledPointGroup(
 // ========= GPU Pipeline Start =============
 private[spark] case class GDFColumnData(
     rawDF: DataFrame,
-    colsIndices: Seq[Array[Int]]) {
-  def hasGroup: Boolean = (colsIndices.length == 4) && colsIndices(3).nonEmpty
-}
+    colsIndices: Seq[Array[Int]],
+    groupColName: Option[String])
 // ========= GPU Pipeline End =============
 
 object XGBoost extends Serializable {
@@ -468,6 +468,39 @@ object XGBoost extends Serializable {
     updatedParams
   }
 
+  private def repartitionForGroup(
+      groupName: String,
+      dataFrame: DataFrame,
+      nWorkers: Int): DataFrame = {
+    // Group the data first
+    logger.info("LTR start groupBy")
+    val schema = dataFrame.schema
+    val groupedDF = dataFrame
+      .groupBy(groupName)
+      .agg(functions.collect_list(functions.struct(
+        schema.fieldNames.map(functions.col): _*)) as "list")
+
+    implicit val encoder = RowEncoder(schema)
+    // Expand the grouped rows after repartition
+    groupedDF.repartition(nWorkers).mapPartitions(iter => {
+      new Iterator[Row] {
+        var iterInRow: Iterator[Any] = Iterator.empty
+
+        override def hasNext: Boolean = {
+          if (iter.hasNext && !iterInRow.hasNext) {
+            // the first is groupId, second is list
+            iterInRow = iter.next.getSeq(1).iterator
+          }
+          iterInRow.hasNext
+        }
+
+        override def next(): Row = {
+          iterInRow.next.asInstanceOf[Row]
+        }
+      }
+    })
+  }
+
   // repartition all the Columnar RDDs (training and evaluation) to nWorkers,
   // and get the GDF column indices separately from each Columnar RDD.
   // Then wrap this repartitioned RDD and columns indices by a map
@@ -481,10 +514,14 @@ object XGBoost extends Serializable {
     if (isCacheData) {
       logger.warn("Data cache is not support for Gpu pipeline!")
     }
+
     (Map(trainName -> trainingData) ++ evalSetsMap).map {
       case (name, colData) =>
-        // No low cost way to get number of partitions from DataFrame, so always repartition
-        name -> GDFColumnData(colData.rawDF.repartition(nWorkers), colData.colsIndices)
+        // No light cost way to get number of partitions from DataFrame, so always repartition
+        val newDF = colData.groupColName
+          .map(gn => repartitionForGroup(gn, colData.rawDF, nWorkers))
+          .getOrElse(colData.rawDF.repartition(nWorkers))
+        name -> GDFColumnData(newDF, colData.colsIndices, colData.groupColName)
     }
   }
 

@@ -151,7 +151,7 @@ class SparkParallelismTracker(
     } else {
       try {
         logger.info(s"starting GPU training with timeout set as $timeout ms" +
-          s"for waiting for resources")
+          s" for waiting for resources")
         waitForCondition(numAliveCores >= requestedCores && numAliveWorkers >= numWorkers, timeout)
       } catch {
         case _: TimeoutException =>

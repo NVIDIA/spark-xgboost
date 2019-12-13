@@ -158,9 +158,13 @@ object DataUtils extends Serializable {
         s"but found [${indices.head.map(schema.fieldNames).mkString(", ")}]!")
     require(indices(1).nonEmpty, "Missing label column in schema!")
     // Check if has group
-    if (colNames(3).nonEmpty) {
+    val opGroup = if (colNames(3).nonEmpty) {
       require(indices(3).nonEmpty, "Can not find group column in schema!")
+      Some(groupColName)
+    } else {
+      None
     }
-    GDFColumnData(dataFrame, indices)
+
+    GDFColumnData(dataFrame, indices, opGroup)
   }
 }
