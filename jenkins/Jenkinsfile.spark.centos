@@ -28,7 +28,7 @@ pipeline {
         string(name: 'REF', defaultValue: '\${gitlabBranch}', description: 'Commit to build')
     }
 
-    environment { CUDF_VERSION='0.11'}
+    environment { CUDF_VERSION='0.12'}
 
     // Build stages
     stages {
