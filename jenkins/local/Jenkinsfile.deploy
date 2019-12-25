@@ -23,7 +23,7 @@ node('docker-deploy') {
 
     timeout (time: 240, unit: 'MINUTES') {
     withEnv ([
-        'CUDF_VERSION=0.11',
+        'CUDF_VERSION=0.12',
         "OUT=$WORKSPACE/out",
         'LOCAL_ROOT=jenkins/local',
         'BUILD_SCRIPT=$LOCAL_ROOT/build-jvm-multi.sh',
