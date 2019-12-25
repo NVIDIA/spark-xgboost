@@ -485,9 +485,10 @@ object XGBoost extends Serializable {
         } else if (curNumberPartitions == nWorkers) {
           name -> colData
         } else {
-          throw new IllegalArgumentException(s"Can NOT repartition from $curNumberPartitions to " +
-            s"$nWorkers since GPU doesn't support shuffle repartition. Please change spark " +
-            s"configs to have more partitions (>= $nWorkers) initialized after data loaded.")
+          throw new IllegalArgumentException(s"Can NOT repartition [$name] data from" +
+            s" $curNumberPartitions to $nWorkers since GPU doesn't support shuffle repartition." +
+            s" Please change spark configs to have more partitions (>= $nWorkers)" +
+            s" initialized after data loaded.")
         }
     }
   }
