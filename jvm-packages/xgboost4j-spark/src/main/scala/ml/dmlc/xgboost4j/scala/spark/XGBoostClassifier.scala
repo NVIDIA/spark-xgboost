@@ -20,7 +20,7 @@ import ai.rapids.cudf.Table
 import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 import ml.dmlc.xgboost4j.java.{Rabit, XGBoostSparkJNI}
 import ml.dmlc.xgboost4j.scala.spark.params._
-import ml.dmlc.xgboost4j.scala.spark.rapids.PluginUtils
+import ml.dmlc.xgboost4j.scala.spark.rapids.{PluginUtils, RowConverter}
 import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, EvalTrait, ObjectiveTrait, XGBoost => SXGBoost}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.commons.logging.LogFactory
@@ -341,7 +341,12 @@ class XGBoostClassificationModel private[ml](
 
   private def transformInternalHonorGpu(dataFrame: DataFrame): DataFrame = {
     val originalSchema = dataFrame.schema
-    val schema = StructType(originalSchema.fields ++
+
+    // dataReadSchema filters out some fields that RowConverter is not supporting
+    val dataReadSchema = StructType(originalSchema.fields.filter(x =>
+      RowConverter.isSupportingType(x.dataType)))
+
+    val schema = StructType(dataReadSchema.fields ++
       Seq(StructField(name = _rawPredictionCol, dataType =
         ArrayType(FloatType, containsNull = false), nullable = false)) ++
       Seq(StructField(name = _probabilityCol, dataType =
