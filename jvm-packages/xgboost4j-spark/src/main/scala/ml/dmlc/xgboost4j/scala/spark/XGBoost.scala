@@ -20,8 +20,10 @@ import java.io.File
 import java.nio.file.Files
 
 import ai.rapids.cudf.Table
+import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 
 import scala.collection.{AbstractIterator, mutable}
+import scala.collection.JavaConverters._
 import scala.util.Random
 import ml.dmlc.xgboost4j.java.{IRabitTracker, Rabit, XGBoostError, XGBoostSparkJNI, RabitTracker => PyRabitTracker}
 import ml.dmlc.xgboost4j.scala.rabit.RabitTracker
@@ -33,8 +35,9 @@ import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.commons.io.FileUtils
 import org.apache.commons.logging.LogFactory
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.{SparkContext, SparkParallelismTracker, TaskContext}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, Row, SparkSession, functions}
 import org.apache.spark.storage.StorageLevel
 
 /**
@@ -69,8 +72,9 @@ private[spark] case class XGBLabeledPointGroup(
 
 // ========= GPU Pipeline Start =============
 private[spark] case class GDFColumnData(
-    rawRDD: RDD[Table],
-    colsIndices: Seq[Array[Int]])
+    rawDF: DataFrame,
+    colsIndices: Seq[Array[Int]],
+    groupColName: Option[String])
 // ========= GPU Pipeline End =============
 
 object XGBoost extends Serializable {
@@ -464,6 +468,39 @@ object XGBoost extends Serializable {
     updatedParams
   }
 
+  private def repartitionForGroup(
+      groupName: String,
+      dataFrame: DataFrame,
+      nWorkers: Int): DataFrame = {
+    // Group the data first
+    logger.info("LTR start groupBy")
+    val schema = dataFrame.schema
+    val groupedDF = dataFrame
+      .groupBy(groupName)
+      .agg(functions.collect_list(functions.struct(
+        schema.fieldNames.map(functions.col): _*)) as "list")
+
+    implicit val encoder = RowEncoder(schema)
+    // Expand the grouped rows after repartition
+    groupedDF.repartition(nWorkers).mapPartitions(iter => {
+      new Iterator[Row] {
+        var iterInRow: Iterator[Any] = Iterator.empty
+
+        override def hasNext: Boolean = {
+          if (iter.hasNext && !iterInRow.hasNext) {
+            // the first is groupId, second is list
+            iterInRow = iter.next.getSeq(1).iterator
+          }
+          iterInRow.hasNext
+        }
+
+        override def next(): Row = {
+          iterInRow.next.asInstanceOf[Row]
+        }
+      }
+    })
+  }
+
   // repartition all the Columnar RDDs (training and evaluation) to nWorkers,
   // and get the GDF column indices separately from each Columnar RDD.
   // Then wrap this repartitioned RDD and columns indices by a map
@@ -477,19 +514,14 @@ object XGBoost extends Serializable {
     if (isCacheData) {
       logger.warn("Data cache is not support for Gpu pipeline!")
     }
+
     (Map(trainName -> trainingData) ++ evalSetsMap).map {
       case (name, colData) =>
-        val curNumberPartitions = colData.rawRDD.getNumPartitions
-        if (curNumberPartitions > nWorkers) {
-          name -> GDFColumnData(colData.rawRDD.coalesce(nWorkers), colData.colsIndices)
-        } else if (curNumberPartitions == nWorkers) {
-          name -> colData
-        } else {
-          throw new IllegalArgumentException(s"Can NOT repartition [$name] data from" +
-            s" $curNumberPartitions to $nWorkers since GPU doesn't support shuffle repartition." +
-            s" Please change spark configs to have more partitions (>= $nWorkers)" +
-            s" initialized after data loaded.")
-        }
+        // No light cost way to get number of partitions from DataFrame, so always repartition
+        val newDF = colData.groupColName
+          .map(gn => repartitionForGroup(gn, colData.rawDF, nWorkers))
+          .getOrElse(colData.rawDF.repartition(nWorkers))
+        name -> GDFColumnData(newDF, colData.colsIndices, colData.groupColName)
     }
   }
 
@@ -503,7 +535,7 @@ object XGBoost extends Serializable {
 
     dataMap.foldLeft(emptyDataRdd) {
       case (zippedRdd, (name, gdfColData)) =>
-        zippedRdd.zipPartitions(gdfColData.rawRDD) {
+        zippedRdd.zipPartitions(PluginUtils.toColumnarRdd(gdfColData.rawDF)) {
           (itWrapper, itTable) =>
             (itWrapper.toArray :+ (name -> itTable)).filter(x => x != null).toIterator
         }
@@ -518,7 +550,7 @@ object XGBoost extends Serializable {
     val gpuId = XGBoostSparkJNI.allocateGpuDevice()
     logger.info("XGboost GPU training using device: " + gpuId)
     if (gpuId != 0) {
-      (gpuId, params + ("gpu_id" -> gpuId.toString()))
+      (gpuId, params + ("gpu_id" -> gpuId.toString))
     } else {
       (gpuId, params)
     }
@@ -542,7 +574,7 @@ object XGBoost extends Serializable {
     if (noEvalSet) {
       // Get the indices here at driver side to avoid passing the whole Map to executor(s)
       val colIndicesForTrain = dataMap(trainName).colsIndices
-      dataMap(trainName).rawRDD.mapPartitions({
+      PluginUtils.toColumnarRdd(dataMap(trainName).rawDF).mapPartitions({
         iter: Iterator[Table] =>
           val (gpuId, paramsWithGpuId) = appendGpuIdToParameters(updatedParams)
 
@@ -582,7 +614,7 @@ object XGBoost extends Serializable {
     // First check and get parameters.
     // Second prepare the training data and run training
     // Then setup checkpoint manager
-    val sc = trainingData.rawRDD.sparkContext
+    val sc = trainingData.rawDF.sparkSession.sparkContext
     val (nWorkers, round, _, _, _, _, trackerConf, timeoutRequestWorkers,
       checkpointPath, checkpointInterval) = parameterFetchAndValidation(params, sc)
     val dataMap = prepareDataForGpu(trainingData, evalSetsMap, nWorkers, params)
@@ -860,6 +892,7 @@ private object Watches {
   }
 
   // ========= GPU Pipeline Begin =============
+  // Suppose "indices" are given in this order <features, label, weight, group>
   private def buildDMatrixIncrementally(gpuId: Int, missing: Float, indices: Seq[Array[Int]],
       iter: Iterator[Table], inferNumClass: Boolean = false): (DMatrix, Double) = {
 
@@ -871,36 +904,42 @@ private object Watches {
 
     var isFirstBunch = true
     var dm: DMatrix = null
-    var groupInfo: Array[Int] = Array()
-    var isLtr = false
+    val (weightIndices, groupIndices) = (indices(2), indices(3))
+    val hasWeight = weightIndices.nonEmpty
+    // For LTR
+    val groupInfo = new mutable.ArrayBuffer[java.lang.Integer]
+    val weightInfo = new mutable.ArrayBuffer[java.lang.Float]
+    var groupId = 0
+    val isLTR = groupIndices.nonEmpty
 
     var max: Double = Double.MinValue
     while (iter.hasNext) {
-      val table = iter.next()
+      val columnBatch = new GpuColumnBatch(iter.next(), null)
+      if (isLTR) {
+        // Build group info, along with weight info if needed (-1 means no weight)
+        val weightIdx = if (hasWeight) weightIndices(0) else -1
+        groupId = columnBatch.groupAndAggregateOnColumnsHost(groupIndices(0), weightIdx, groupId,
+          groupInfo.asJava, weightInfo.asJava)
+      }
 
-      // Suppose gdf column indices are given in this order <features, label, weight, group>,
-      // Pls refer to method 'DataUtils.buildGDFColumnData'.
-      // First transform indices to native handles for (features, label, weight)
-      val gdfColsHandles = indices.take(3).map(_.map(table.getColumn(_).getNativeCudfColumnAddress))
-
-      // Then set others (weight && group) as needed
-      var weight_ = gdfColsHandles(2)
-      val (weightIndices, groupIndices) = (indices(2), indices(3))
-      // Disable LTR now
-      require(groupIndices.isEmpty, "Learning to rank currently is not supported.")
-
+      // Transform indices to native handles for (features, label)
+      val gdfColsHandles = indices.take(2).map(_.map(columnBatch.getColumn))
+      val (features_, label_) = (gdfColsHandles.head, gdfColsHandles(1))
+      // Weight is set differently from LTR to non-LTR.
+      // GPU column handle is used for non-LTR, but cpu "Array[Float]" is used for LTR to support
+      // chunk loading.
+      val weight_ = if (isLTR) Array.emptyLongArray else weightIndices.map(columnBatch.getColumn)
+      // Build DMatrix
       if (isFirstBunch) {
         isFirstBunch = false
-        // Suppose gdf columns are given in this order: features, label, weight,
-        // the same with that in 'DataUtils.buildGDFColumnData'.
-        dm = new DMatrix(gdfColsHandles(0), gpuId, missingValue)
-        dm.setCUDFInfo("label", gdfColsHandles(1))
+        dm = new DMatrix(features_, gpuId, missingValue)
+        dm.setCUDFInfo("label", label_)
         if (weight_.nonEmpty) {
           dm.setCUDFInfo("weight", weight_)
         }
       } else {
-        dm.appendCUDF(gdfColsHandles(0))
-        dm.appendCUDFInfo("label", gdfColsHandles(1))
+        dm.appendCUDF(features_)
+        dm.appendCUDFInfo("label", label_)
         if (weight_.nonEmpty) {
           dm.appendCUDFInfo("weight", weight_)
         }
@@ -909,19 +948,22 @@ private object Watches {
       if (inferNumClass) {
         // calculate max label to reduce
         indices(1).foreach(index => {
-          val scalar = table.getColumn(index).max()
+          val scalar = columnBatch.getColumnVector(index).max
           if (scalar.isValid) {
             val tmp = scalar.getDouble
             max = if (max < tmp) tmp else max
           }
         })
       }
-      // Close the table
-      table.close
+      // Close the table(GpuColumnBatch)
+      columnBatch.close()
     }
     logger.debug("Num class: " + max)
-    if (dm != null && isLtr) {
-      dm.setGroup(groupInfo)
+    if (dm != null && isLTR) {
+      logger.info("Learning to rank.")
+      dm.setGroup(groupInfo.map(_.intValue).toArray)
+      // To support chunk loading, use CPU way to set weight info for LTR.
+      if (hasWeight) dm.setWeight(weightInfo.map(_.floatValue).toArray)
     }
     (dm, max)
   }
