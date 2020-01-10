@@ -17,8 +17,7 @@
 package ml.dmlc.xgboost4j.scala.spark
 
 import ai.rapids.cudf.Table
-import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
-import ml.dmlc.xgboost4j.java.{Rabit, XGBoostSparkJNI}
+import ml.dmlc.xgboost4j.java.Rabit
 import ml.dmlc.xgboost4j.scala.spark.params._
 import ml.dmlc.xgboost4j.scala.spark.rapids.{PluginUtils, RowConverter}
 import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, EvalTrait, ObjectiveTrait, XGBoost => SXGBoost}
@@ -363,14 +362,12 @@ class XGBoostClassificationModel private[ml](
         s"but found [${featureIndices.map(originalSchema.fieldNames).mkString(", ")}]!")
 
     val missing = getMissingValue
-    val resultRDD = PluginUtils.toColumnarRdd(dataFrame).mapPartitions((iter: Iterator[Table]) => {
 
-      // call allocateGpuDevice to force assignment of GPU when in exclusive process mode
-      // and pass that as the gpu_id, assumption is that if you are using CUDA_VISIBLE_DEVICES
-      // it doesn't hurt to call allocateGpuDevice so just always do it.
-      var gpuId = XGBoostSparkJNI.allocateGpuDevice()
+    val sc = dataFrame.sparkSession.sparkContext
+    val isLocal = sc.isLocal
+    val resultRDD = PluginUtils.toColumnarRdd(dataFrame).mapPartitions((iter: Iterator[Table]) => {
+      val gpuId = DataUtils.getGpuId(isLocal)
       logger.info("XGboost transform GPU pipeline using device: " + gpuId)
-      if (gpuId == 0) gpuId = -1
 
       val ((dm, columnBatchToRow), time) = PluginUtils.time("Transform: build dmatrix and row") {
         DataUtils.buildDMatrixIncrementally(gpuId, missing, featureIndices, iter, originalSchema)

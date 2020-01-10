@@ -245,47 +245,16 @@ Java_ml_dmlc_xgboost4j_java_XGBoostSparkJNI_getGpuDevice(JNIEnv * env,
 
 JNIEXPORT jint JNICALL
 Java_ml_dmlc_xgboost4j_java_XGBoostSparkJNI_allocateGpuDevice(JNIEnv * env,
-    jclass clazz) {
-    // first try auto assignment by calling cudaFree, if that comes back with error
-    // then loop over all GPUs
-    cudaError_t error = cudaFree(0);
-    int device_ordinal;
+    jclass clazz, jint gpu_id) {
+
+    cudaError_t error = cudaSetDevice(gpu_id);
     if (error != cudaSuccess) {
-      int n_devices;
-      cudaError_t error = cudaGetDeviceCount(&n_devices);
-      if (error != cudaSuccess) {
-        throw_java_exception(env, "Error running cudaGetDeviceCount");
-      }
-      // TODO - could add more checks here about usable devices
-      // loop twice just in case hit race with someone else
-      int n_iters = n_devices * 2;
-      device_ordinal = 0;
-      while (n_iters > 0) {
-        error = cudaSetDevice(device_ordinal);
-        if (error != cudaSuccess) {
-          throw_java_exception(env, "Error running cudaSetDevice");
-        }
-        // initialize a context
-        error = cudaFree(0);
-        if (error == cudaSuccess) {
-          return device_ordinal;
-        } else if (error == cudaErrorDevicesUnavailable) {
-          // assume we lost the race or all are in use so try again
-        } else {
-          throw_java_exception(env, "Error running cudaFree");
-        }
-        n_iters--;
-        if ((device_ordinal >= n_devices - 1) || (device_ordinal < 0)) {
-          device_ordinal= 0;
-        } else {
-          device_ordinal++;
-        }
-      }
-      throw_java_exception(env, "Error: could not acquire a GPU!");
+       throw_java_exception(env, "Error running cudaSetDevice");
     }
-    error = cudaGetDevice(&device_ordinal);
+    // initialize a context
+    error = cudaFree(0);
     if (error != cudaSuccess) {
-      throw_java_exception(env, "Error running cudaGetDevice after allocation");
+      throw_java_exception(env, "Error running cudaFree");
     }
-    return device_ordinal;
+    return 0;
 }
