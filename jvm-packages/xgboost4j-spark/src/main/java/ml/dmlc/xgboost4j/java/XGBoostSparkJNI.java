@@ -49,5 +49,5 @@ public class XGBoostSparkJNI {
 
   public static native int getGpuDevice();
 
-  public static native int allocateGpuDevice();
+  public static native int allocateGpuDevice(int gpuId);
 }

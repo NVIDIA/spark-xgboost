@@ -327,14 +327,13 @@ class XGBoostRegressionModel private[ml] (
         s"but found [${featureIndices.map(originalSchema.fieldNames).mkString(", ")}]!")
 
     val missing = getMissingValue
-    val resultRDD = PluginUtils.toColumnarRdd(dataFrame).mapPartitions((iter: Iterator[Table]) => {
 
-      // call allocateGpuDevice to force assignment of GPU when in exclusive process mode
-      // and pass that as the gpu_id, assumption is that if you are using CUDA_VISIBLE_DEVICES
-      // it doesn't hurt to call allocateGpuDevice so just always do it.
-      var gpuId = XGBoostSparkJNI.allocateGpuDevice()
+    val sc = dataFrame.sparkSession.sparkContext
+    val isLocal = sc.isLocal
+
+    val resultRDD = PluginUtils.toColumnarRdd(dataFrame).mapPartitions((iter: Iterator[Table]) => {
+      val gpuId = DataUtils.getGpuId(isLocal)
       logger.info("XGboost regressor transform GPU pipeline using device: " + gpuId)
-      if (gpuId == 0) gpuId = -1
 
       val ((dm, columnBatchToRow), time) = PluginUtils.time("Transform: build dmatrix and row") {
         DataUtils.buildDMatrixIncrementally(gpuId, missing, featureIndices, iter, originalSchema)

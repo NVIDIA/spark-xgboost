@@ -543,17 +543,12 @@ object XGBoost extends Serializable {
   }
 
   // This method is running on executor side
-  private def appendGpuIdToParameters(params: Map[String, Any]): (Int, Map[String, Any]) = {
-    // Call allocateGpuDevice to force assignment of GPU when in exclusive process mode
-    // and pass that as the gpu_id, assumption is that if you are using CUDA_VISIBLE_DEVICES
-    // it doesn't hurt to call allocateGpuDevice so just always do it.
-    val gpuId = XGBoostSparkJNI.allocateGpuDevice()
+  private def appendGpuIdToParameters(params: Map[String, Any], isLocal: Boolean):
+      (Int, Map[String, Any]) = {
+    val gpuId = DataUtils.getGpuId(isLocal)
     logger.info("XGboost GPU training using device: " + gpuId)
-    if (gpuId != 0) {
-      (gpuId, params + ("gpu_id" -> gpuId.toString))
-    } else {
-      (gpuId, params)
-    }
+    XGBoostSparkJNI.allocateGpuDevice(gpuId)
+    (gpuId, params + ("gpu_id" -> gpuId.toString))
   }
 
   @throws(classOf[XGBoostError])
@@ -570,13 +565,14 @@ object XGBoost extends Serializable {
     val (nWorkers, _, useExternalMemory, obj, eval, missing, _, _, _, _) =
       parameterFetchAndValidation(updatedParams, sc)
 
+    val isLocal = sc.isLocal
     // Start training
     if (noEvalSet) {
       // Get the indices here at driver side to avoid passing the whole Map to executor(s)
       val colIndicesForTrain = dataMap(trainName).colsIndices
       PluginUtils.toColumnarRdd(dataMap(trainName).rawDF).mapPartitions({
         iter: Iterator[Table] =>
-          val (gpuId, paramsWithGpuId) = appendGpuIdToParameters(updatedParams)
+          val (gpuId, paramsWithGpuId) = appendGpuIdToParameters(updatedParams, isLocal)
 
           val watches = Watches.buildWatches(getCacheDirName(useExternalMemory),
             gpuId, missing, colIndicesForTrain, iter, inferNumClass)
@@ -589,7 +585,7 @@ object XGBoost extends Serializable {
       val nameAndColIndices = dataMap.map(nc => (nc._1, nc._2.colsIndices))
       coPartitionForGpu(dataMap, sc, nWorkers).mapPartitions {
         nameAndColumnBatchIter =>
-          val (gpuId, paramsWithGpuId) = appendGpuIdToParameters(updatedParams)
+          val (gpuId, paramsWithGpuId) = appendGpuIdToParameters(updatedParams, isLocal)
 
           val watches = Watches.buildWatchesWithEval(getCacheDirName(useExternalMemory), gpuId,
             missing, nameAndColIndices, nameAndColumnBatchIter, inferNumClass)

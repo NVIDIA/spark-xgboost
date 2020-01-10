@@ -26,10 +26,10 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostSparkJNI_getGpuDevice
 /*
  * Class:     ml_dmlc_xgboost4j_java_XGBoostSparkJNI
  * Method:    allocateGpuDevice
- * Signature: ()I
+ * Signature: (I)I
  */
 JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostSparkJNI_allocateGpuDevice
-  (JNIEnv *, jclass);
+  (JNIEnv *, jclass, jint);
 
 #ifdef __cplusplus
 }
