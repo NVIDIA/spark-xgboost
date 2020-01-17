@@ -22,6 +22,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.catalyst.util.DateTimeConstants._
 
 private[xgboost4j] class RowConverter(schema: StructType, timeUnits: Seq[TimeUnit]) {
   private val converters = schema.fields.map {
@@ -131,8 +132,8 @@ private[xgboost4j] object RowConverter {
     private val NANOS_PER_MICROS: Long = 1000 // to work compatible with Spark 2.3.3
     private def toMicros(value: Long, unit: TimeUnit): Long = {
       unit match {
-        case TimeUnit.SECONDS => value * DateTimeUtils.MICROS_PER_SECOND
-        case TimeUnit.MILLISECONDS | TimeUnit.NONE => value * DateTimeUtils.MICROS_PER_MILLIS
+        case TimeUnit.SECONDS => value * MICROS_PER_SECOND
+        case TimeUnit.MILLISECONDS | TimeUnit.NONE => value * MICROS_PER_MILLIS
         case TimeUnit.MICROSECONDS => value
         case TimeUnit.NANOSECONDS => value / NANOS_PER_MICROS
       }
