@@ -10,8 +10,7 @@
 set -e
 gcc --version
 
-#BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2 -Dcudf.classifier=cuda10-centos7"
-BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2 -Dcudf.classifier=cuda10"
+BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2"
 
 cd jvm-packages
 . /opt/tools/to_cuda10.0.sh
