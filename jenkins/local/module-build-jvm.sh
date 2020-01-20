@@ -26,8 +26,7 @@ buildXgboost4j(){
     fi
 }
 
-####### build xgboost4j .so for CUDA9.2 and 10.1 ##
-buildXgboost4j 9.2
+####### build xgboost4j .so for and 10.1 ##
 buildXgboost4j 10.1
 
 ####### build xgboost4j .so for CUDA10.0 and jars ##

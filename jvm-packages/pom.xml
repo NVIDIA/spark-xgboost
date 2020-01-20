@@ -38,7 +38,7 @@
         <scala.version>2.12.8</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
         <cudf.version>0.12-SNAPSHOT</cudf.version>
-        <cudf.classifier>cuda10</cudf.classifier>
+        <cudf.classifier></cudf.classifier>
     </properties>
     <repositories>
         <repository>
@@ -53,7 +53,7 @@
     </modules>
     <profiles>
         <profile>
-            <id>cuda9.2</id>
+            <id>cuda10.0</id>
             <properties>
                 <cudf.classifier></cudf.classifier>
             </properties>
