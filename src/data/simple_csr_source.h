@@ -9,14 +9,14 @@
 #define XGBOOST_DATA_SIMPLE_CSR_SOURCE_H_
 
 #ifdef XGBOOST_USE_CUDF
-#include <cudf/types.h>
+#include <cudf/types.hpp>
+using column_view = cudf::column_view;
 #endif
 
 #include <xgboost/base.h>
 #include <xgboost/data.h>
 #include <vector>
 #include <algorithm>
-
 
 namespace xgboost {
 namespace data {
@@ -47,7 +47,7 @@ class SimpleCSRSource : public DataSource {
     \param cols CUDA columns
     \param n_cols number of CUDA columns
    */
-  void InitFromCUDF(gdf_column** cols, size_t n_cols, int gpu_id, bst_float missing);
+  void InitFromCUDF(column_view** cols, size_t n_cols, int gpu_id, bst_float missing);
 #endif
   
   /*!

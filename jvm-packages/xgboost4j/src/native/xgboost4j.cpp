@@ -22,7 +22,8 @@
 #include <vector>
 #include <string>
 #ifdef XGBOOST_USE_CUDF
-#include <cudf/types.h>
+#include <cudf/types.hpp>
+using column_view = cudf::column_view;
 #endif
 
 // helper functions
@@ -286,7 +287,7 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixCreateFro
     XGBAPISetLastError("Null columns");
     return -1;
   }
-  int ret = XGDMatrixCreateFromCUDF((gdf_column**)cols,
+  int ret = XGDMatrixCreateFromCUDF((column_view**)cols,
       (size_t)num_cols, &dhandle, gpu_id, missing);
   if (cols != nullptr) {
     jenv->ReleaseLongArrayElements(jcols, cols, 0);
@@ -317,7 +318,7 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixAppendCUD
     return -1;
   }
 
-  int ret = XGDMatrixAppendCUDF((gdf_column**)cols, (size_t)num_cols,
+  int ret = XGDMatrixAppendCUDF((column_view**)cols, (size_t)num_cols,
       (DMatrixHandle)jhandle, gpu_id, missing);
   return ret;
 #else
@@ -344,7 +345,7 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixSetCUDFIn
     XGBAPISetLastError(msg.c_str());
     return -1;
   }
-  int ret = XGDMatrixSetCUDFInfo((DMatrixHandle)jhandle, field, (gdf_column**)cols, (size_t)num_cols, gpu_id);
+  int ret = XGDMatrixSetCUDFInfo((DMatrixHandle)jhandle, field, (column_view**)cols, (size_t)num_cols, gpu_id);
   if (field != nullptr) {
     jenv->ReleaseStringUTFChars(jfield, field);
   }
@@ -377,7 +378,7 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixAppendCUD
     XGBAPISetLastError(msg.c_str());
     return -1;
   }
-  int ret = XGDMatrixAppendCUDFInfo((DMatrixHandle)jhandle, field, (gdf_column**)cols, (size_t)num_cols, gpu_id);
+  int ret = XGDMatrixAppendCUDFInfo((DMatrixHandle)jhandle, field, (column_view**)cols, (size_t)num_cols, gpu_id);
   if (field != nullptr) {
     jenv->ReleaseStringUTFChars(jfield, field);
   }

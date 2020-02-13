@@ -3,9 +3,10 @@
  */
 
 #ifdef XGBOOST_USE_CUDF
-#include <cudf/types.h>
 #include <xgboost/data.h>
 #include <xgboost/logging.h>
+
+#include <cudf/column/column_view.hpp>
 
 #include "../common/device_helpers.cuh"
 #include "../common/host_device_vector.h"
@@ -16,28 +17,29 @@ namespace xgboost {
 using namespace data;
 
 __global__ void unpack_cudf_column_k
-  (float* data, size_t n_rows, size_t n_cols, gdf_column col) {
+  (float* data, size_t n_rows, size_t n_cols, void const* colData, type_id type) {
   size_t i = threadIdx.x + blockIdx.x * blockDim.x;
   if (i >= n_rows)
     return;
-  data[n_cols * i] = ConvertDataElement(col.data, i, col.dtype);
+  data[n_cols * i] = ConvertDataElement(colData, i, type);
 }
 
-void MetaInfo::SetCUDFInfo(const char* key, gdf_column** cols, size_t n_cols, int gpu_id) {
+void MetaInfo::SetCUDFInfo(const char* key, column_view** cols, size_t n_cols, int gpu_id) {
   this->SetCUDFInfoImpl(key, cols, n_cols, gpu_id, false);
 }
 
-void MetaInfo::AppendCUDFInfo(const char* key, gdf_column** cols, size_t n_cols, int gpu_id) {
+void MetaInfo::AppendCUDFInfo(const char* key, column_view** cols, size_t n_cols, int gpu_id) {
   this->SetCUDFInfoImpl(key, cols, n_cols, gpu_id, true);
 }
 
-void MetaInfo::SetCUDFInfoImpl(const char* key, gdf_column** cols, size_t n_cols,
+void MetaInfo::SetCUDFInfoImpl(const char* key, column_view** cols, size_t n_cols,
                                int gpu_id, bool append) {
   CHECK_GT(n_cols, 0);
-  size_t n_rows = cols[0]->size;
+  size_t n_rows = cols[0]->size();
+  CHECK_GE(n_rows, 0U);
   for (size_t i = 0; i < n_cols; ++i) {
-    CHECK_EQ(cols[i]->null_count, 0) << "all labels and weights must be valid";
-    CHECK_EQ(cols[i]->size, n_rows) << "all CUDF columns must be of the same size";
+    CHECK_EQ(cols[i]->null_count(), 0) << "all labels and weights must be valid";
+    CHECK_EQ(cols[i]->size(), n_rows) << "all CUDF columns must be of the same size";
   }
   HostDeviceVector<bst_float>* field = nullptr;
   if (!strcmp(key, "label")) {
@@ -66,8 +68,9 @@ void MetaInfo::SetCUDFInfoImpl(const char* key, gdf_column** cols, size_t n_cols
   data += prev_size;
   for (size_t i = 0; i < n_cols; ++i) {
     int block = 256;
+    auto pCol = cols[i];
     unpack_cudf_column_k<<<common::DivRoundUp(n_rows, block), block>>>
-      (data + i, n_rows, n_cols, *cols[i]);
+      (data + i, n_rows, n_cols, pCol->head(), pCol->type().id());
     dh::safe_cuda(cudaGetLastError());
   }
 }

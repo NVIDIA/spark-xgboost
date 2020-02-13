@@ -48,9 +48,9 @@ public class DMatrixForCUDFTest {
       weightCol = ColumnVector.fromFloats(infoData);
       weightCol.ensureOnDevice();
 
-      DMatrix dmat = new DMatrix(new long[]{featureCol.getNativeCudfColumnAddress()});
-      dmat.setCUDFInfo("label", new long[]{labelCol.getNativeCudfColumnAddress()});
-      dmat.setCUDFInfo("weight", new long[]{weightCol.getNativeCudfColumnAddress()});
+      DMatrix dmat = new DMatrix(new long[]{featureCol.getNativeView()});
+      dmat.setCUDFInfo("label", new long[]{labelCol.getNativeView()});
+      dmat.setCUDFInfo("weight", new long[]{weightCol.getNativeView()});
 
       TestCase.assertTrue("Wrong label ", Arrays.equals(dmat.getLabel(), infoData));
       TestCase.assertTrue("Wrong weight ", Arrays.equals(dmat.getWeight(), infoData));
@@ -92,14 +92,14 @@ public class DMatrixForCUDFTest {
       weightCol = ColumnVector.fromFloats(infoData);
       weightCol.ensureOnDevice();
 
-      nativeCols[0] = v0.getNativeCudfColumnAddress();
-      nativeCols[1] = v1.getNativeCudfColumnAddress();
-      nativeCols[2] = v2.getNativeCudfColumnAddress();
-      nativeCols[3] = v3.getNativeCudfColumnAddress();
+      nativeCols[0] = v0.getNativeView();
+      nativeCols[1] = v1.getNativeView();
+      nativeCols[2] = v2.getNativeView();
+      nativeCols[3] = v3.getNativeView();
 
       DMatrix dmat = new DMatrix(nativeCols, 0, -1.0f);
-      dmat.setCUDFInfo("label", new long[]{labelCol.getNativeCudfColumnAddress()});
-      dmat.setCUDFInfo("weight", new long[]{weightCol.getNativeCudfColumnAddress()});
+      dmat.setCUDFInfo("label", new long[]{labelCol.getNativeView()});
+      dmat.setCUDFInfo("weight", new long[]{weightCol.getNativeView()});
 
       TestCase.assertTrue("Wrong label ", Arrays.equals(dmat.getLabel(), infoData));
       TestCase.assertTrue("Wrong weight ", Arrays.equals(dmat.getWeight(), infoData));
