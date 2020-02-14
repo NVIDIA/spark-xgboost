@@ -128,8 +128,9 @@ object GpuDatasetData {
       case LongType => DType.INT64
       case FloatType => DType.FLOAT32
       case DoubleType => DType.FLOAT64
-      case DateType => DType.DATE32
-      case TimestampType => DType.TIMESTAMP
+      case DateType => DType.TIMESTAMP_DAYS
+      // FIXME which one in DType should be used here?
+      case TimestampType => DType.TIMESTAMP_MICROSECONDS
       case unknownType => throw new UnsupportedOperationException(
         s"Unsupported Spark SQL type $unknownType")
     }
