@@ -32,5 +32,6 @@ set_target_properties(
 target_link_libraries(xgboost4j
   PRIVATE
   rmm
+  ${CUDF_LIBRARY}
   ${LINKED_LIBRARIES_PRIVATE}
   ${JAVA_JVM_LIBRARY})

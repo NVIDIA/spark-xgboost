@@ -140,7 +140,7 @@ target_include_directories(runxgboost
   ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/dmlc-core/include
   ${PROJECT_SOURCE_DIR}/rabit/include)
-target_link_libraries(runxgboost PRIVATE ${LINKED_LIBRARIES_PRIVATE})
+target_link_libraries(runxgboost PRIVATE ${CUDF_LIBRARY} ${LINKED_LIBRARIES_PRIVATE})
 set_target_properties(
   runxgboost PROPERTIES
   OUTPUT_NAME xgboost
