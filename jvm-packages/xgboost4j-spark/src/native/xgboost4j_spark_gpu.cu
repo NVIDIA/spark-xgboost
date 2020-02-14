@@ -154,7 +154,7 @@ cudaError_t build_unsaferow_nullsets(uint64_t* dest,
     uint64_t null_mask = 0;
     for (int i = 0; i < num_bits_per_row; ++i) {
       if (vvecs[i] != NULL) {
-        uint8_t valid_byte = vvecs[i][vvec_byte_idx];
+        uint32_t valid_byte = vvecs[i][vvec_byte_idx];
         uint64_t nullbit = (~valid_byte >> vvec_bitshift) & 0x1;
         null_mask |= nullbit << i;
       }
