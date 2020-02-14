@@ -95,15 +95,15 @@ cudaError_t store_with_stride_async(void* dest, void const* src, long count,
                          byte_stride, stream);
     break;
   case 2:
-    stride_store<int16_t>(dest, static_cast<int16_t*>(src), count,
+    stride_store<int16_t>(dest, static_cast<int16_t const*>(src), count,
                           byte_stride, stream);
     break;
   case 4:
-    stride_store<int32_t>(dest, static_cast<int32_t*>(src), count,
+    stride_store<int32_t>(dest, static_cast<int32_t const*>(src), count,
                           byte_stride, stream);
     break;
   case 8:
-    stride_store<int64_t>(dest, static_cast<int64_t*>(src), count,
+    stride_store<int64_t>(dest, static_cast<int64_t const*>(src), count,
                           byte_stride, stream);
     break;
   default:

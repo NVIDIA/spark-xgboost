@@ -23,7 +23,7 @@
 #include <string>
 #ifdef XGBOOST_USE_CUDF
 #include <cudf/types.hpp>
-using column_view = cudf::column_view;
+using cudf::column_view;
 #endif
 
 // helper functions

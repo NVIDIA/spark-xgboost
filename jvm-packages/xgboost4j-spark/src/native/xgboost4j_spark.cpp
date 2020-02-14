@@ -29,13 +29,12 @@
 #include "xgboost4j_spark_gpu.h"
 #include "xgboost4j_spark.h"
 
-namespace xgboost {
-namespace spark {
-
-using namespace cudf;
 using cudf::column_view;
 using cudf::type_id;
 using cudf::bitmask_type;
+
+namespace xgboost {
+namespace spark {
 
 /*! \brief utility class to track GPU allocations */
 class unique_gpu_ptr {
@@ -88,19 +87,21 @@ static unsigned int get_unsaferow_nullset_size(unsigned int num_columns) {
 /*! \brief Returns the byte width of the specified gdf_dtype or 0 on error. */
 static size_t get_dtype_size(type_id dtype) {
   switch (dtype) {
-  case BOOL8:
-  case INT8:
+  case type_id::BOOL8:
+  case type_id::INT8:
     return 1;
-  case INT16:
+  case type_id::INT16:
     return 2;
-  case INT32:
-  case FLOAT32:
-  case DATE32:
+  case type_id::INT32:
+  case type_id::FLOAT32:
+  case type_id::TIMESTAMP_DAYS:
     return 4;
-  case INT64:
-  case FLOAT64:
-  case DATE64:
-  case TIMESTAMP_MILLISECONDS:
+  case type_id::INT64:
+  case type_id::FLOAT64:
+  case type_id::TIMESTAMP_SECONDS:
+  case type_id::TIMESTAMP_MILLISECONDS:
+  case type_id::TIMESTAMP_MICROSECONDS:
+  case type_id::TIMESTAMP_NANOSECONDS:
     return 8;
   default:
     break;
