@@ -204,7 +204,6 @@ public class GpuColumnBatch {
     } else if (type instanceof DateType) {
       return DType.TIMESTAMP_DAYS;
     } else if (type instanceof TimestampType) {
-      //FIXME Which timestamp type is better ?
       return DType.TIMESTAMP_MICROSECONDS;
     } else if (type instanceof StringType) {
       return DType.STRING; // TODO what do we want to do about STRING_CATEGORY???

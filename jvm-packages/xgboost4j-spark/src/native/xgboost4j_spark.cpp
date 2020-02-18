@@ -84,29 +84,9 @@ static unsigned int get_unsaferow_nullset_size(unsigned int num_columns) {
   return ((num_columns + 63) / 64) * 8;
 }
 
-/*! \brief Returns the byte width of the specified gdf_dtype or 0 on error. */
+/*! \brief Returns the byte width of the specified data type. */
 static size_t get_dtype_size(type_id dtype) {
-  switch (dtype) {
-  case type_id::BOOL8:
-  case type_id::INT8:
-    return 1;
-  case type_id::INT16:
-    return 2;
-  case type_id::INT32:
-  case type_id::FLOAT32:
-  case type_id::TIMESTAMP_DAYS:
-    return 4;
-  case type_id::INT64:
-  case type_id::FLOAT64:
-  case type_id::TIMESTAMP_SECONDS:
-  case type_id::TIMESTAMP_MILLISECONDS:
-  case type_id::TIMESTAMP_MICROSECONDS:
-  case type_id::TIMESTAMP_NANOSECONDS:
-    return 8;
-  default:
-    break;
-  }
-  return 0;
+  return cudf::size_of(cudf::data_type(dtype));
 }
 
 static void build_unsafe_row_nullsets(void* unsafe_rows_dptr,
