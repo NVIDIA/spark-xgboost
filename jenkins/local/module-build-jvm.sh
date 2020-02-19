@@ -20,7 +20,7 @@ buildXgboost4j(){
     CUDA_VER=cuda$1
     . /opt/tools/to_$CUDA_VER.sh
     if [ "$CUDA_VER" == cuda10.0 ]; then
-        mvn clean package -B $MVN_ARG
+        mvn clean package -B -DskipTests $MVN_ARG
     else
         ./create_jni.py $CUDA_VER
     fi
