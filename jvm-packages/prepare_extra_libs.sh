@@ -20,6 +20,7 @@ else
     echo "Using cudf jar: ${CUDF_JAR_PATH}"
 
     # Extract the native libraries from jar file.
+    mkdir -p ${LIB_CACHE_PATH}
     unzip -o ${CUDF_JAR_PATH} "*/Linux/*.so" -d "${LIB_CACHE_PATH}"
     mv `find "${LIB_CACHE_PATH}" -name *.so` ${LIB_CACHE_PATH}
     ln -s libboost_filesystem.so ${LIB_CACHE_PATH}/libboost_filesystem.so.1.70.0
