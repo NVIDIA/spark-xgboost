@@ -10,9 +10,8 @@
 set -e
 gcc --version
 
-BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2"
 BUILD_MODULE=$WORKSPACE/jenkins/local/module-build-jvm.sh
-. $BUILD_MODULE "deploy $BUILD_ARG"
+. $BUILD_MODULE "deploy" "$WORKSPACE/.m2"
 
 
 

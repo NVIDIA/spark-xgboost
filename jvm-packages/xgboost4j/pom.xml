@@ -83,7 +83,7 @@
                   <arguments>
                       <argument>prepare_extra_libs.sh</argument>
                       <argument>${settings.localRepository}</argument>
-                      <argument>${project.build.directory}/extra-libs</argument>
+                      <argument>${user.dir}/../build/extra-libs/</argument>
                       <argument>${cudf.version}</argument>
                       <argument>${cudf.classifier}</argument>
                   </arguments>
@@ -105,7 +105,7 @@
                           <arguments>
                             <argument>create_jni.py</argument>
                             <argument>${cuda.version}</argument>
-                            <argument>${project.build.directory}/extra-libs</argument>
+                            <argument>${user.dir}/../build/extra-libs/</argument>
                           </arguments>
                           <workingDirectory>${user.dir}</workingDirectory>
                       </configuration>
