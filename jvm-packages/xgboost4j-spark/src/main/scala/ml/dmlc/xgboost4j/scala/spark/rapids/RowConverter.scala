@@ -16,7 +16,7 @@
 
 package ml.dmlc.xgboost4j.scala.spark.rapids
 
-import ai.rapids.cudf.TimeUnit
+import ai.rapids.cudf.DType
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.Row
@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.catalyst.util.DateTimeConstants._
 
-private[xgboost4j] class RowConverter(schema: StructType, timeUnits: Seq[TimeUnit]) {
+private[xgboost4j] class RowConverter(schema: StructType, timeUnits: Seq[DType]) {
   private val converters = schema.fields.map {
     f => RowConverter.getConverterForType(f.dataType)
   }
@@ -46,13 +46,13 @@ private[xgboost4j] class RowConverter(schema: StructType, timeUnits: Seq[TimeUni
 
 private[xgboost4j] object RowConverter {
   private abstract class TypeConverter {
-    final def convert(row: InternalRow, column: Int, timeUnits: Seq[TimeUnit]): Any = {
+    final def convert(row: InternalRow, column: Int, timeUnits: Seq[DType]): Any = {
       if (row.isNullAt(column)) null else convertImpl(row, column, timeUnits)
     }
 
     protected def convertImpl(row: InternalRow, column: Int): Any
 
-    protected def convertImpl(row: InternalRow, column: Int, timeUnits: Seq[TimeUnit]): Any = {
+    protected def convertImpl(row: InternalRow, column: Int, timeUnits: Seq[DType]): Any = {
       convertImpl(row, column)
     }
   }
@@ -130,17 +130,20 @@ private[xgboost4j] object RowConverter {
 
   private object TimestampConverter extends TypeConverter {
     private val NANOS_PER_MICROS: Long = 1000 // to work compatible with Spark 2.3.3
-    private def toMicros(value: Long, unit: TimeUnit): Long = {
+    private def toMicros(value: Long, unit: DType): Long = {
       unit match {
-        case TimeUnit.SECONDS => value * MICROS_PER_SECOND
-        case TimeUnit.MILLISECONDS | TimeUnit.NONE => value * MICROS_PER_MILLIS
-        case TimeUnit.MICROSECONDS => value
-        case TimeUnit.NANOSECONDS => value / NANOS_PER_MICROS
+        case DType.TIMESTAMP_SECONDS => value * MICROS_PER_SECOND
+        case DType.TIMESTAMP_MILLISECONDS => value * MICROS_PER_MILLIS
+        case DType.TIMESTAMP_MICROSECONDS => value
+        case DType.TIMESTAMP_NANOSECONDS => value / NANOS_PER_MICROS
+        case DType.TIMESTAMP_DAYS => throw new IllegalArgumentException("TIMESTAMP_DAYS is not" +
+          " supported yet. You may use 'DateType' for it!")
+        case _ => throw new IllegalArgumentException("Unsupported timestamp type ${unit}.")
       }
     }
 
     override protected def convertImpl(
-        row: InternalRow, column: Int, timeUnits: Seq[TimeUnit]): Any = {
+        row: InternalRow, column: Int, timeUnits: Seq[DType]): Any = {
       DateTimeUtils.toJavaTimestamp(toMicros(row.getLong(column), timeUnits(column)))
     }
 

@@ -52,7 +52,7 @@ public class GpuColumnBatch {
 
   public long getColumn(int index) {
     ColumnVector v = table.getColumn(index);
-    return v.getNativeCudfColumnAddress();
+    return v.getNativeView();
   }
 
   public ColumnVector getColumnVectorInitHost(int index) {
@@ -202,9 +202,9 @@ public class GpuColumnBatch {
     } else if (type instanceof FloatType) {
       return DType.FLOAT32;
     } else if (type instanceof DateType) {
-      return DType.DATE32;
+      return DType.TIMESTAMP_DAYS;
     } else if (type instanceof TimestampType) {
-      return DType.TIMESTAMP;
+      return DType.TIMESTAMP_MICROSECONDS;
     } else if (type instanceof StringType) {
       return DType.STRING; // TODO what do we want to do about STRING_CATEGORY???
     }

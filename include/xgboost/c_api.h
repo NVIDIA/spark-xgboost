@@ -12,7 +12,8 @@
 #include <cstdio>
 #include <cstdint>
 #ifdef XGBOOST_USE_CUDF
-#include <cudf/types.h>
+#include <cudf/types.hpp>
+using cudf::column_view;
 #endif
 #else
 #define XGB_EXTERN_C
@@ -117,7 +118,7 @@ XGB_DLL int XGBRegisterLogCallback(void (*callback)(const char*));
  * \return 0 when success, -1 when failure happens
  */
 XGB_DLL int XGDMatrixCreateFromCUDF
-(gdf_column **cols, size_t n_cols, DMatrixHandle *out, int gpu_id, float missing);
+(column_view **cols, size_t n_cols, DMatrixHandle *out, int gpu_id, float missing);
 
 /*!
  * \brief Appends to a data matrix the CUDA data frame (CUDF)
@@ -134,7 +135,7 @@ XGB_DLL int XGDMatrixCreateFromCUDF
  * \return 0 when success, -1 when failure happens
  */
 XGB_DLL int XGDMatrixAppendCUDF
-(gdf_column **cols, size_t n_cols, DMatrixHandle handle, int gpu_idi, float missing);
+(column_view **cols, size_t n_cols, DMatrixHandle handle, int gpu_idi, float missing);
 #endif
 
 /*!
@@ -308,7 +309,7 @@ XGB_DLL int XGDMatrixSetFloatInfo(DMatrixHandle handle,
  */
 XGB_DLL int XGDMatrixSetCUDFInfo(DMatrixHandle handle,
                                  const char *field,
-                                 gdf_column** gdf,
+                                 column_view** gdf,
                                  size_t n_cols,
                                  int gpu_id);
 
@@ -325,7 +326,7 @@ XGB_DLL int XGDMatrixSetCUDFInfo(DMatrixHandle handle,
  */
 XGB_DLL int XGDMatrixAppendCUDFInfo(DMatrixHandle handle,
                                     const char *field,
-                                    gdf_column** gdf,
+                                    column_view** gdf,
                                     size_t n_cols,
                                     int gpu_id);
 #endif

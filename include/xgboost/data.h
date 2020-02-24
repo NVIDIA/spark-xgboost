@@ -17,7 +17,8 @@
 #include <string>
 #include <vector>
 #ifdef XGBOOST_USE_CUDF
-#include <cudf/types.h>
+#include <cudf/types.hpp>
+using cudf::column_view;
 #endif
 
 #include "./base.h"
@@ -135,7 +136,7 @@ class MetaInfo {
    * \param n_cols The number of CUDF columns.
    * \param gpu_id id of gpu to use.
    */
-  void SetCUDFInfo(const char* key, gdf_column** cols, size_t n_cols, int gpu_id);
+  void SetCUDFInfo(const char* key, column_view** cols, size_t n_cols, int gpu_id);
   /*!
    * \brief Append to the existing meta info from CUDF columns.
    * \param key The key of the information.
@@ -143,7 +144,7 @@ class MetaInfo {
    * \param n_cols The number of CUDF columns.
    * \param gpu_id id of gpu to use.
    */
-  void AppendCUDFInfo(const char* key, gdf_column** cols, size_t n_cols, int gpu_id);
+  void AppendCUDFInfo(const char* key, column_view** cols, size_t n_cols, int gpu_id);
 #endif
 
  private:
@@ -151,7 +152,7 @@ class MetaInfo {
   mutable std::vector<size_t> label_order_cache_;
 #ifdef XGBOOST_USE_CUDF
   /*! \brief CUDF meta info implementation */
-  void SetCUDFInfoImpl(const char* key, gdf_column** cols, size_t n_cols, int gpu_id, bool append);
+  void SetCUDFInfoImpl(const char* key, column_view** cols, size_t n_cols, int gpu_id, bool append);
 #endif
 };
 

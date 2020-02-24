@@ -23,12 +23,12 @@
 namespace xgboost {
 namespace spark {
 
-cudaError_t store_with_stride_async(void* dest, void* src, long count,
+cudaError_t store_with_stride_async(void* dest, void const* src, long count,
                                     int byte_width, int byte_stride,
                                     cudaStream_t stream);
 
 cudaError_t build_unsaferow_nullsets(uint64_t* dest,
-                                     const uint8_t* const* validity_vectors,
+                                     const uint32_t* const* validity_vectors,
                                      int num_vectors, unsigned int rows);
 
 } // namespace spark

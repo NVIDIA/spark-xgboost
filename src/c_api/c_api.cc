@@ -191,7 +191,7 @@ int XGDMatrixCreateFromDataIter(
 
 #ifdef XGBOOST_USE_CUDF
 int XGDMatrixCreateFromCUDF
-(gdf_column **cols, size_t n_cols, DMatrixHandle *out, int gpu_id, bst_float missing) {
+(column_view **cols, size_t n_cols, DMatrixHandle *out, int gpu_id, bst_float missing) {
   API_BEGIN();
   std::unique_ptr<data::SimpleCSRSource> source(new data::SimpleCSRSource());
   source->InitFromCUDF(cols, n_cols, gpu_id, missing);
@@ -200,7 +200,7 @@ int XGDMatrixCreateFromCUDF
 }
 
 int XGDMatrixAppendCUDF
-(gdf_column **cols, size_t n_cols, DMatrixHandle handle, int gpu_id, bst_float missing) {
+(column_view **cols, size_t n_cols, DMatrixHandle handle, int gpu_id, bst_float missing) {
   API_BEGIN();
   CHECK_HANDLE();
   auto dmat = static_cast<std::shared_ptr<DMatrix>*>(handle);
@@ -728,7 +728,7 @@ XGB_DLL int XGDMatrixSetFloatInfo(DMatrixHandle handle,
 #ifdef XGBOOST_USE_CUDF
 XGB_DLL int XGDMatrixSetCUDFInfo(DMatrixHandle handle,
                                 const char *field,
-                                gdf_column **cols,
+                                column_view **cols,
                                 size_t n_cols,
                                 int gpu_id) {
   API_BEGIN();
@@ -740,7 +740,7 @@ XGB_DLL int XGDMatrixSetCUDFInfo(DMatrixHandle handle,
 
 XGB_DLL int XGDMatrixAppendCUDFInfo(DMatrixHandle handle,
                                     const char *field,
-                                    gdf_column **cols,
+                                    column_view **cols,
                                     size_t n_cols,
                                     int gpu_id) {
   API_BEGIN();

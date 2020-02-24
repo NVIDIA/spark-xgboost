@@ -24,9 +24,20 @@ find_path(CUDF_INCLUDE_DIR "cudf"
         "$ENV{CONDA_PREFIX}/include")
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(CUDF DEFAULT_MSG
+find_package_handle_standard_args(CUDF_INCLUDE DEFAULT_MSG
                                   CUDF_INCLUDE_DIR)
+
+find_library(CUDF_LIBRARY
+  NAMES cudf
+  HINTS $ENV{CUDF_ROOT}/lib/
+        ${CUDF_ROOT}/lib
+        $ENV{CONDA_PREFIX}/lib)
+
+
+find_package_handle_standard_args(CUDF_LIBRARY DEFAULT_MSG
+                                  CUDF_LIBRARY)
 
 mark_as_advanced(
   CUDF_INCLUDE_DIR
+  CUDF_LIBRARY
 )

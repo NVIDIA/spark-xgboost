@@ -74,7 +74,7 @@ protected:
 };
 
 template <typename store_type>
-void stride_store(void* dest, store_type* src, long count,
+void stride_store(void* dest, store_type const* src, long count,
                   int32_t byte_stride, cudaStream_t stream = 0) {
   store_type* o_data = static_cast<store_type*>(dest);
   // Issues with int division are handled at a higher level
@@ -86,24 +86,24 @@ void stride_store(void* dest, store_type* src, long count,
   thrust::copy(thrust::device, input_dptr, input_dptr + count, iter.begin());
 }
 
-cudaError_t store_with_stride_async(void* dest, void* src, long count,
+cudaError_t store_with_stride_async(void* dest, void const* src, long count,
                                     int byte_width, int byte_stride,
                                     cudaStream_t stream) {
   switch (byte_width) {
   case 1:
-    stride_store<int8_t>(dest, static_cast<int8_t*>(src), count,
+    stride_store<int8_t>(dest, static_cast<int8_t const*>(src), count,
                          byte_stride, stream);
     break;
   case 2:
-    stride_store<int16_t>(dest, static_cast<int16_t*>(src), count,
+    stride_store<int16_t>(dest, static_cast<int16_t const*>(src), count,
                           byte_stride, stream);
     break;
   case 4:
-    stride_store<int32_t>(dest, static_cast<int32_t*>(src), count,
+    stride_store<int32_t>(dest, static_cast<int32_t const*>(src), count,
                           byte_stride, stream);
     break;
   case 8:
-    stride_store<int64_t>(dest, static_cast<int64_t*>(src), count,
+    stride_store<int64_t>(dest, static_cast<int64_t const*>(src), count,
                           byte_stride, stream);
     break;
   default:
@@ -114,7 +114,7 @@ cudaError_t store_with_stride_async(void* dest, void* src, long count,
 }
 
 cudaError_t build_unsaferow_nullsets(uint64_t* dest,
-                                     const uint8_t* const* validity_vectors,
+                                     const uint32_t* const* validity_vectors,
                                      int num_vectors, unsigned int rows) {
   auto dest_dptr = thrust::device_pointer_cast(dest);
   const int num_nullset_longs_per_row = (num_vectors + 63) / 64;
@@ -147,14 +147,14 @@ cudaError_t build_unsaferow_nullsets(uint64_t* dest,
 
     // Get a base pointer to the array of (up to 64) validity vectors that
     // will be accessed to fill this long word of the row's null bitset.
-    const uint8_t* const* vvecs = validity_vectors + nullset_long_idx * 64;
+    const uint32_t* const* vvecs = validity_vectors + nullset_long_idx * 64;
 
-    int vvec_bitshift = row % 8;
-    int vvec_byte_idx = row / 8;
+    int vvec_bitshift = row % 32;
+    int vvec_byte_idx = row / 32;
     uint64_t null_mask = 0;
     for (int i = 0; i < num_bits_per_row; ++i) {
       if (vvecs[i] != NULL) {
-        uint8_t valid_byte = vvecs[i][vvec_byte_idx];
+        uint32_t valid_byte = vvecs[i][vvec_byte_idx];
         uint64_t nullbit = (~valid_byte >> vvec_bitshift) & 0x1;
         null_mask |= nullbit << i;
       }

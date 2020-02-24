@@ -10,7 +10,7 @@
 set -e
 gcc --version
 
-BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2"
+BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2 -DskipTests -B -s settings.xml -Pmirror-apache-to-gpuwa"
 
 cd jvm-packages
 . /opt/tools/to_cuda10.0.sh

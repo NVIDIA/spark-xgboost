@@ -23,10 +23,15 @@
 
 #include <cuda_runtime.h>
 #include <cudf/cudf.h>
+#include <cudf/column/column_view.hpp>
 #include <rmm/rmm.h>
 
 #include "xgboost4j_spark_gpu.h"
 #include "xgboost4j_spark.h"
+
+using cudf::column_view;
+using cudf::type_id;
+using cudf::bitmask_type;
 
 namespace xgboost {
 namespace spark {
@@ -79,41 +84,23 @@ static unsigned int get_unsaferow_nullset_size(unsigned int num_columns) {
   return ((num_columns + 63) / 64) * 8;
 }
 
-/*! \brief Returns the byte width of the specified gdf_dtype or 0 on error. */
-static size_t get_dtype_size(gdf_dtype dtype) {
-  switch (dtype) {
-  case GDF_BOOL8:
-  case GDF_INT8:
-    return 1;
-  case GDF_INT16:
-    return 2;
-  case GDF_INT32:
-  case GDF_FLOAT32:
-  case GDF_DATE32:
-    return 4;
-  case GDF_INT64:
-  case GDF_FLOAT64:
-  case GDF_DATE64:
-  case GDF_TIMESTAMP:
-    return 8;
-  default:
-    break;
-  }
-  return 0;
+/*! \brief Returns the byte width of the specified data type. */
+static size_t get_dtype_size(type_id dtype) {
+  return cudf::size_of(cudf::data_type(dtype));
 }
 
 static void build_unsafe_row_nullsets(void* unsafe_rows_dptr,
-    std::vector<gdf_column const*> const& gdfcols) {
+    std::vector<column_view const*> const& gdfcols) {
   unsigned int num_columns = gdfcols.size();
-  size_t num_rows = gdfcols[0]->size;
+  size_t num_rows = gdfcols[0]->size();
 
   // make the array of validity data pointers available on the device
-  std::vector<uint8_t const*> valid_ptrs(num_columns);
+  std::vector<uint32_t const*> valid_ptrs(num_columns);
   for (int i = 0; i < num_columns; ++i) {
-    valid_ptrs[i] = gdfcols[i]->valid;
+    valid_ptrs[i] = gdfcols[i]->null_mask();
   }
   unique_gpu_ptr dev_valid_mem(num_columns * sizeof(*valid_ptrs.data()));
-  uint8_t** dev_valid_ptrs = reinterpret_cast<uint8_t**>(dev_valid_mem.get());
+  uint32_t** dev_valid_ptrs = reinterpret_cast<uint32_t**>(dev_valid_mem.get());
   cudaError_t cuda_status = cudaMemcpy(dev_valid_ptrs, valid_ptrs.data(),
       num_columns * sizeof(valid_ptrs[0]), cudaMemcpyHostToDevice);
   if (cuda_status != cudaSuccess) {
@@ -139,10 +126,10 @@ static void build_unsafe_row_nullsets(void* unsafe_rows_dptr,
  * where the null bitset is a collection of 64-bit words with each bit
  * indicating whether the corresponding field is null.
  */
-void* build_unsafe_rows(std::vector<gdf_column const*> const& gdfcols) {
+void* build_unsafe_rows(std::vector<column_view const*> const& gdfcols) {
   cudaError_t cuda_status;
   unsigned int num_columns = gdfcols.size();
-  size_t num_rows = gdfcols[0]->size;
+  size_t num_rows = gdfcols[0]->size();
   unsigned int nullset_size = get_unsaferow_nullset_size(num_columns);
   unsigned int row_size = nullset_size + num_columns * 8;
   size_t unsafe_rows_size = num_rows * row_size;
@@ -155,13 +142,13 @@ void* build_unsafe_rows(std::vector<gdf_column const*> const& gdfcols) {
   for (int i = 0; i < num_columns; ++i) {
     // point to the corresponding field in the first UnsafeRow
     uint8_t* dest_addr = unsafe_rows_dptr + nullset_size + i * 8;
-    unsigned int dtype_size = get_dtype_size(gdfcols[i]->dtype);
+    unsigned int dtype_size = get_dtype_size(gdfcols[i]->type().id());
     if (dtype_size == 0) {
       throw std::runtime_error("Unsupported column type");
     }
 
     cuda_status = xgboost::spark::store_with_stride_async(dest_addr,
-        gdfcols[i]->data, num_rows, dtype_size, row_size, 0);
+        gdfcols[i]->head(), num_rows, dtype_size, row_size, 0);
     if (cuda_status != cudaSuccess) {
       throw std::runtime_error(cudaGetErrorString(cuda_status));
     }
@@ -212,13 +199,13 @@ Java_ml_dmlc_xgboost4j_java_XGBoostSparkJNI_buildUnsafeRows(JNIEnv * env,
     return 0;
   }
 
-  std::vector<gdf_column const*> gdfcols(num_columns);
+  std::vector<column_view const*> gdfcols(num_columns);
   jlong* column_jlongs = env->GetLongArrayElements(nativeColumnPtrs, nullptr);
   if (column_jlongs == nullptr) {
     return 0;
   }
   for (int i = 0; i < num_columns; ++i) {
-    gdfcols[i] = reinterpret_cast<gdf_column*>(column_jlongs[i]);
+    gdfcols[i] = reinterpret_cast<column_view*>(column_jlongs[i]);
   }
   env->ReleaseLongArrayElements(nativeColumnPtrs, column_jlongs, JNI_ABORT);
 

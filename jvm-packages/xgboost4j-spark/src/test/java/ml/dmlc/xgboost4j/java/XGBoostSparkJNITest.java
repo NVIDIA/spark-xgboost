@@ -46,10 +46,10 @@ public class XGBoostSparkJNITest {
       v2.ensureOnDevice();
       v3.ensureOnDevice();
       long[] nativeCols = new long[numColumns];
-      nativeCols[0] = v0.getNativeCudfColumnAddress();
-      nativeCols[1] = v1.getNativeCudfColumnAddress();
-      nativeCols[2] = v2.getNativeCudfColumnAddress();
-      nativeCols[3] = v3.getNativeCudfColumnAddress();
+      nativeCols[0] = v0.getNativeView();
+      nativeCols[1] = v1.getNativeView();
+      nativeCols[2] = v2.getNativeView();
+      nativeCols[3] = v3.getNativeView();
 
       final int rowSize = UnsafeRow.calculateBitSetWidthInBytes(numColumns)
           + numColumns * 8;
