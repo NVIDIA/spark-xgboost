@@ -19,8 +19,8 @@ package ml.dmlc.xgboost4j.java.spark.rapids;
 import java.util.List;
 
 import ai.rapids.cudf.ColumnVector;
-
 import ai.rapids.cudf.DType;
+import ai.rapids.cudf.HostColumnVector;
 import ai.rapids.cudf.Table;
 
 import org.apache.spark.sql.types.*;
@@ -55,31 +55,30 @@ public class GpuColumnBatch {
     return v.getNativeView();
   }
 
-  public ColumnVector getColumnVectorInitHost(int index) {
+  public HostColumnVector getColumnVectorInitHost(int index) {
     ColumnVector cv = table.getColumn(index);
-    cv.ensureOnHost();
-    return cv;
+    return cv.copyToHost();
   }
 
   public void close() {
     table.close();
   }
 
-  private static double getNumericValueInColumn(int dataIndex, ColumnVector cv) {
-    DType type = cv.getType();
+  private static double getNumericValueInColumn(int dataIndex, HostColumnVector hcv) {
+    DType type = hcv.getType();
     double value;
     if (type == DType.FLOAT32) {
-      value = cv.getFloat(dataIndex);
+      value = hcv.getFloat(dataIndex);
     } else if (type == DType.INT32) {
-      value = cv.getInt(dataIndex);
+      value = hcv.getInt(dataIndex);
     } else if (type == DType.INT8) {
-      value = cv.getByte(dataIndex);
+      value = hcv.getByte(dataIndex);
     } else if (type == DType.INT16) {
-      value = cv.getShort(dataIndex);
+      value = hcv.getShort(dataIndex);
     } else if (type == DType.FLOAT64) {
-      value = cv.getDouble(dataIndex);
+      value = hcv.getDouble(dataIndex);
     } else if (type == DType.INT64) {
-      value = cv.getLong(dataIndex);
+      value = hcv.getLong(dataIndex);
     } else {
       throw new IllegalArgumentException("Not a numeric type");
     }
@@ -87,10 +86,9 @@ public class GpuColumnBatch {
   }
 
   private double getNumericValueInColumn(int dataIndex, int colIndex, double defVal) {
-    ColumnVector cv = getColumnVector(colIndex);
-    cv.ensureOnHost();
-    return cv.getRowCount() > 0 ?
-            getNumericValueInColumn(dataIndex, cv) :
+    HostColumnVector hcv = getColumnVectorInitHost(colIndex);
+    return hcv.getRowCount() > 0 ?
+            getNumericValueInColumn(dataIndex, hcv) :
             defVal;
   }
 
@@ -117,7 +115,7 @@ public class GpuColumnBatch {
       List<Integer> groupInfo, List<Float> weightInfo) {
     // Weight: Initialize info if having weight column
     final boolean hasWeight = weightIdx >= 0;
-    ColumnVector aggrCV = null;
+    HostColumnVector aggrCV = null;
     Float curWeight = null;
     if (hasWeight) {
       aggrCV = getColumnVectorInitHost(weightIdx);
@@ -126,7 +124,7 @@ public class GpuColumnBatch {
       curWeight = weightInfo.isEmpty() ? firstWeight : weightInfo.get(weightInfo.size() - 1);
     }
     // Initialize group info
-    ColumnVector groupCV = getColumnVectorInitHost(groupIdx);
+    HostColumnVector groupCV = getColumnVectorInitHost(groupIdx);
     int groupId = prevTailGid;
     int groupSize = groupInfo.isEmpty() ? 0 : groupInfo.get(groupInfo.size() - 1);
     for (int i = 0; i < groupCV.getRowCount(); i ++) {

@@ -41,10 +41,6 @@ public class XGBoostSparkJNITest {
          ColumnVector v1 = ColumnVector.fromBoxedLongs(2L, 4L, null, 8L);
          ColumnVector v2 = ColumnVector.fromBoxedFloats(20.0f, null, null, null);
          ColumnVector v3 = ColumnVector.fromShorts((short)200, (short)150, (short)100, (short)25)) {
-      v0.ensureOnDevice();
-      v1.ensureOnDevice();
-      v2.ensureOnDevice();
-      v3.ensureOnDevice();
       long[] nativeCols = new long[numColumns];
       nativeCols[0] = v0.getNativeView();
       nativeCols[1] = v1.getNativeView();
