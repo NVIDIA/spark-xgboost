@@ -40,13 +40,10 @@ public class DMatrixForCUDFTest {
       float[] infoData = new float[]{5.0f, 6.0f, 7.0f};
       // feature
       featureCol = ColumnVector.fromFloats(1.0f, 2.0f, 3.0f);
-      featureCol.ensureOnDevice();
       // label
       labelCol = ColumnVector.fromFloats(infoData);
-      labelCol.ensureOnDevice();
       // weight
       weightCol = ColumnVector.fromFloats(infoData);
-      weightCol.ensureOnDevice();
 
       DMatrix dmat = new DMatrix(new long[]{featureCol.getNativeView()});
       dmat.setCUDFInfo("label", new long[]{labelCol.getNativeView()});
@@ -77,20 +74,14 @@ public class DMatrixForCUDFTest {
       v1 = ColumnVector.fromBoxedFloats(-1.0f, -1.0f, -1.0f);
       v2 = ColumnVector.fromBoxedFloats(-1.0f, -1.0f, 3.0f);
       v3 = ColumnVector.fromBoxedFloats(-1.0f, 1.0f, 2.0f);
-      v0.ensureOnDevice();
-      v1.ensureOnDevice();
-      v2.ensureOnDevice();
-      v3.ensureOnDevice();
 
       long[] nativeCols = new long[numColumns];
 
       //create Matrix from CUDF
       // label
       labelCol = ColumnVector.fromFloats(infoData);
-      labelCol.ensureOnDevice();
       // weight
       weightCol = ColumnVector.fromFloats(infoData);
-      weightCol.ensureOnDevice();
 
       nativeCols[0] = v0.getNativeView();
       nativeCols[1] = v1.getNativeView();
