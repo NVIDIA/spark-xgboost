@@ -296,13 +296,6 @@
             </build>
         </profile>
     </profiles>
-    <distributionManagement>
-        <repository>
-            <id>spark.sw.nvidia.com</id>
-            <name>sw-spark-maven</name>
-            <url>https://gpuwa.nvidia.com/artifactory/sw-spark-maven-local</url>
-        </repository>
-    </distributionManagement>
     <build>
         <resources>
             <resource>

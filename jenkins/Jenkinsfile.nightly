@@ -13,6 +13,11 @@ import groovy.transform.Field
 @Field
 def utils
 
+def SERVERS_MAP = [
+    'Gpuwa': 'https://gpuwa.nvidia.com/artifactory/sw-spark-maven-local',
+    'Local': 'http://apt-sh04:8081/repository/xgboost-spark-release'
+]
+
 pipeline {
     agent any
 
@@ -26,14 +31,22 @@ pipeline {
     }
 
     parameters {
+        choice(name: 'DEPLOY_TYPE', choices: ['Gpuwa', 'Local'],
+            description: 'REPO where to deploy xgboost artifacts')
         string(name: 'REF', defaultValue: 'support-spark3.0', description: 'Commit to build')
+    }
+
+    environment {
+        LOCAL_ROOT='jenkins/local'
+        BUILD_SCRIPT='$LOCAL_ROOT/build-jvm-multi.sh'
+        DEPLOY_SCRIPT='$LOCAL_ROOT/deploy-jvm-multi.sh'
+        SERVER_URL = "${SERVERS_MAP."$DEPLOY_TYPE"}"
+        CUDF_VERSION='0.13'
     }
 
     triggers {
         cron('H 0 * * *')
     }
-
-    environment { CUDF_VERSION='0.12'}
 
     // Build stages
     stages {
@@ -48,8 +61,13 @@ pipeline {
                 milestone label: 'Sources ready', ordinal: 1
             }
         }
-        stage('Jenkins: Build & Test') {
+        stage('Jenkins: Build & Deploy') {
             agent { label 'docker-gpu' }
+            environment {
+                // Local env for the current docker container
+                OUT="$WORKSPACE/out"
+                SIGN_FILE='false'
+            }
             steps {
                 unstash name: 'srcs'
                 script {
@@ -58,7 +76,10 @@ pipeline {
                         "-f jenkins/local/Dockerfile.centos7_build \
                             --build-arg RAPIDS_VERSION=${CUDF_VERSION} jenkins/local")
                     dockerImage.inside('--runtime=nvidia -v /etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
-                        sh 'scl enable devtoolset-7 jenkins/local/build-jvm-nightly.sh'
+                        sh "scl enable devtoolset-7 '$BUILD_SCRIPT $SIGN_FILE' "
+                        retry(3) {
+                            sh "bash $DEPLOY_SCRIPT $SIGN_FILE"
+                        }
                     }
                 }
             }

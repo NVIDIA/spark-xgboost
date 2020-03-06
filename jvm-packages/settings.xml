@@ -27,5 +27,11 @@
         </repository>
       </repositories>
     </profile>
+    <profile>
+      <id>gpuwa</id>
+      <properties>
+        <altDeploymentRepository>spark.sw.nvidia.com::default::https://gpuwa.nvidia.com/artifactory/sw-spark-maven-local</altDeploymentRepository>
+      </properties>
+    </profile>
   </profiles>
 </settings>
