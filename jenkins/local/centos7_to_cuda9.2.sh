@@ -1,6 +1,5 @@
 # please run with '. this-file-name.sh' or 'source this-file-name.sh'
 
-source activate cuda9.2
 export JAVA_HOME=/opt/conda
 export NCCL_ROOT=/usr/local/nccl
 rm -f /usr/local/cuda /usr/local/nccl
