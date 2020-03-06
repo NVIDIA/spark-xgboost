@@ -81,15 +81,7 @@ ENV PATH=/opt/conda/bin/:$PATH
 RUN conda init --all && \
     . ~/.bashrc && \
     conda install -y cmake openjdk maven git && \
-    conda create -y -n ${CUDA_A} python=3.7 && \
-    conda create -y -n ${CUDA_B} python=3.7 && \
-    conda create -y -n ${CUDA_C} python=3.7 && \
-    conda activate ${CUDA_A} && \
-    conda install -y -c rapidsai/label/${CUDA_A} -c rapidsai-nightly/label/${CUDA_A} -c numba -c conda-forge -c defaults libcudf=${RAPIDS_VERSION} && \
-    conda activate ${CUDA_B} && \
-    conda install -y -c rapidsai/label/${CUDA_B} -c rapidsai-nightly/label/${CUDA_B} -c numba -c conda-forge -c defaults libcudf=${RAPIDS_VERSION} && \
-    conda activate ${CUDA_C} && \
-    conda install -y -c rapidsai/label/${CUDA_C} -c rapidsai-nightly/label/${CUDA_C} -c numba -c conda-forge -c defaults libcudf=${RAPIDS_VERSION}
+    conda install -y -c rapidsai -c rapidsai-nightly -c numba -c conda-forge -c defaults libcudf=${RAPIDS_VERSION}
 
 # set default environments
 RUN ln -s cuda-10.0 /usr/local/cuda && \
