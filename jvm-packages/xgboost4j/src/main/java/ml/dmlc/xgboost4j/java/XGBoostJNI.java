@@ -32,10 +32,8 @@ class XGBoostJNI {
 
   static {
     try {
-      // Force loading the cuDF related native libraries to avoid packing 'librmm.so' into
+      // Force loading the cuDF related native libraries to avoid packing them into
       // xgboost4j Jar file redundantly.
-      // XGBoost Spark involves dependence on librmm, we may refactor to use Java Rmm instead
-      // in future to eliminate this dependence which makes building/runtime pretty complicated.
       logger.info("load cuDF libs");
       NativeDepsLoader.libraryLoaded();
       logger.info("load XGBoost libs");
