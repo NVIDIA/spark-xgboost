@@ -48,11 +48,10 @@ pipeline {
             steps {
                 unstash name: 'srcs'
                 script {
-                    def dockerImage = docker.build(
-                        "xgboost-dev-centos7-build:cudf${CUDF_VERSION}",
-                        "-f jenkins/local/Dockerfile.centos7_build \
-                            --build-arg RAPIDS_VERSION=${CUDF_VERSION} jenkins/local")
-                    dockerImage.inside('--runtime=nvidia -v /etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
+                    def IMAGE_NAME="xgbci/xgboost:xgb3-dev-centos7"
+                    sh "docker pull $IMAGE_NAME"
+                    docker.image(IMAGE_NAME).inside("--runtime=nvidia \
+                        -v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro") {
                         sh 'scl enable devtoolset-7 jenkins/local/build-jvm-premerge.sh'
                     }
                 }
