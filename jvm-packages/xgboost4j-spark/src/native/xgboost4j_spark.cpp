@@ -24,7 +24,6 @@
 #include <cuda_runtime.h>
 #include <cudf/cudf.h>
 #include <cudf/column/column_view.hpp>
-#include <rmm/rmm.h>
 
 #include "xgboost4j_spark_gpu.h"
 #include "xgboost4j_spark.h"
@@ -49,15 +48,15 @@ public:
   }
 
   unique_gpu_ptr(size_t size) : ptr(nullptr) {
-    rmmError_t rmm_status = RMM_ALLOC(&ptr, size, 0);
-    if (rmm_status != RMM_SUCCESS) {
+    cudaError_t status = cudaMalloc(&ptr, size);
+    if (status != cudaSuccess) {
       throw std::bad_alloc();
     }
   }
 
   ~unique_gpu_ptr() {
     if (ptr != nullptr) {
-      RMM_FREE(ptr, 0);
+      cudaFree(ptr);
     }
   }
 

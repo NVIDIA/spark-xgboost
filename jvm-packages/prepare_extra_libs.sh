@@ -8,7 +8,7 @@ CUDF_JAR_CLASS=$4
 
 # Check the cache first
 if [ -d ${LIB_CACHE_PATH} ]; then
-    echo "Already extracted the libcudf.so and librmm.so."
+    echo "Already extracted the cudf related libraries."
 else
     # CUDF_JAR: Determine the path of cudf jar file.
     CUDF_JAR_PATH=${MVN_LOCAL_REPO}/ai/rapids/cudf/${CUDF_JAR_VER}/cudf-${CUDF_JAR_VER}
@@ -28,7 +28,4 @@ else
     # Have the header files ready
     git clone https://github.com/rapidsai/cudf.git -b branch-${CUDF_JAR_VER%%-*} ${LIB_CACHE_PATH}/code-cudf
     mv ${LIB_CACHE_PATH}/code-cudf/cpp/include/* ${LIB_CACHE_PATH}
-    git clone --recursive https://github.com/rapidsai/rmm.git -b branch-${CUDF_JAR_VER%%-*} ${LIB_CACHE_PATH}/code-rmm
-    mv ${LIB_CACHE_PATH}/code-rmm/include/* ${LIB_CACHE_PATH}
-    mv ${LIB_CACHE_PATH}/code-rmm/thirdparty/cnmem/include/* ${LIB_CACHE_PATH}/rmm/detail/
 fi

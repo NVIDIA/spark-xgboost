@@ -40,8 +40,7 @@ if (USE_CUDA)
 
   if (USE_CUDF)
     find_package(CUDF REQUIRED)
-    find_package(RMM REQUIRED)
-    include_directories(${CUDF_INCLUDE_DIR} ${RMM_INCLUDE_DIR})
+    include_directories(${CUDF_INCLUDE_DIR})
     add_definitions(-DXGBOOST_USE_CUDF)
   endif (USE_CUDF)
 
