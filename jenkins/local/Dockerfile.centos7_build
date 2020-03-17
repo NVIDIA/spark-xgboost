@@ -43,7 +43,6 @@ ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 ARG CUDA_A=cuda9.2
 ARG CUDA_B=cuda10.0
 ARG CUDA_C=cuda10.1
-ARG RAPIDS_VERSION=0.12
 
 # install basic softwares
 RUN yum install -y zlib-devel bzip2 centos-release-scl && \
@@ -80,11 +79,12 @@ RUN curl -O https://repo.continuum.io/miniconda/$CONDA_FILE && \
 ENV PATH=/opt/conda/bin/:$PATH
 RUN conda init --all && \
     . ~/.bashrc && \
-    conda install -y cmake openjdk maven git && \
-    conda install -y -c rapidsai -c rapidsai-nightly -c numba -c conda-forge -c defaults libcudf=${RAPIDS_VERSION}
+    conda install -y cmake openjdk maven git
 
 # set default environments
-RUN ln -s cuda-10.0 /usr/local/cuda && \
+RUN git config --system user.name ci && \
+    git config --system user.email ci@github.com && \
+    ln -s cuda-10.0 /usr/local/cuda && \
     ln -s nccl_2.4.7-1+${CUDA_B}_x86_64 /usr/local/nccl
 ENV JAVA_HOME=/opt/conda
 ENV NCCL_ROOT=/usr/local/nccl
