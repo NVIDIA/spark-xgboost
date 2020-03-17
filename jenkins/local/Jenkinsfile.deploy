@@ -23,7 +23,6 @@ node('docker-deploy') {
 
     timeout (time: 240, unit: 'MINUTES') {
     withEnv ([
-        'CUDF_VERSION=0.12',
         "OUT=$WORKSPACE/out",
         'LOCAL_ROOT=jenkins/local',
         'BUILD_SCRIPT=$LOCAL_ROOT/build-jvm-multi.sh',
@@ -36,8 +35,8 @@ node('docker-deploy') {
         sh "rm -rf $OUT"
 
         stage ('Build XGBoost on Centos7') {
-            def dockerImage = docker.build("xgb-build-centos7:cudf${CUDF_VERSION}",
-                    "-f ${LOCAL_ROOT}/Dockerfile.centos7_build --build-arg RAPIDS_VERSION=${CUDF_VERSION} ${LOCAL_ROOT}")
+            def dockerImage = docker.build("xgb3-build-centos7",
+                    "-f ${LOCAL_ROOT}/Dockerfile.centos7_build ${LOCAL_ROOT}")
             dockerImage.inside ('--runtime=nvidia') {
                 sh "scl enable devtoolset-7 '$BUILD_SCRIPT ${secInfo[3]}'"
             }
@@ -49,8 +48,8 @@ node('docker-deploy') {
                 "SERVER_URL=${SERVERS_MAP[params.DEPLOY_SERVER]}",
                 'SERVER_ID=ossrh'
             ]) {
-                def dockerImage = docker.build("xgb-build-centos7:cudf${CUDF_VERSION}",
-                        "-f ${LOCAL_ROOT}/Dockerfile.centos7_build --build-arg RAPIDS_VERSION=${CUDF_VERSION} ${LOCAL_ROOT}")
+                def dockerImage = docker.build("xgb3-build-centos7",
+                        "-f ${LOCAL_ROOT}/Dockerfile.centos7_build ${LOCAL_ROOT}")
                 dockerImage.inside ('--runtime=nvidia -u root') {
                     withCredentials([
                         file(credentialsId: "${secInfo[0]}", variable: 'GPG_FILE'),

@@ -105,7 +105,9 @@ if __name__ == "__main__":
                 maybe_parallel_build = ""
 
             args = ["-D{0}:BOOL={1}".format(k, v) for k, v in CONFIG.items()]
-            cmd_env_setup = "export CMAKE_LIBRARY_PATH=" + extra_lib_path + " && "
+            cmd_env_setup = "export CMAKE_LIBRARY_PATH=%s && \
+                             export CMAKE_INCLUDE_PATH=%s && "\
+                             % (extra_lib_path, extra_lib_path)
             run(cmd_env_setup + "cmake .. " + " ".join(args) + maybe_generator)
             run("cmake --build . --config Release" + maybe_parallel_build)
 
