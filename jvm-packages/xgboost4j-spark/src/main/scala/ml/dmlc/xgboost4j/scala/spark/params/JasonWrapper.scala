@@ -20,7 +20,7 @@ import org.json4s.{JValue, JsonInput}
 import org.json4s.jackson.JsonMethods
 
 // The wrapper of some methods of Jason4s for compatibility issue
-private object JasonWrapper {
+private[spark] object JasonWrapper {
 
   def parse(
     in: JsonInput,

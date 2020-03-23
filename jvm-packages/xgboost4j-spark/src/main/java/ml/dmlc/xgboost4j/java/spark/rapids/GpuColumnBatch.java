@@ -24,14 +24,46 @@ import ai.rapids.cudf.HostColumnVector;
 import ai.rapids.cudf.Table;
 
 import org.apache.spark.sql.types.*;
+import org.apache.spark.util.random.BernoulliCellSampler;
+
+import ml.dmlc.xgboost4j.scala.spark.rapids.GpuSampler;
 
 public class GpuColumnBatch {
-  private final Table table;
+  private Table table;
   private final StructType schema;
+  private final GpuSampler sampler;
 
   public GpuColumnBatch(Table table, StructType schema) {
     this.table = table;
     this.schema = schema;
+    this.sampler = null;
+  }
+
+  public GpuColumnBatch(Table table, StructType schema, GpuSampler sampler) {
+    this.table = table;
+    this.schema = schema;
+    this.sampler = sampler;
+
+    samplingTable();
+  }
+
+  private void samplingTable() {
+    if (sampler != null) {
+      BernoulliCellSampler bcs = new BernoulliCellSampler(sampler.lb(), sampler.ub(),
+          sampler.complement());
+      bcs.setSeed(sampler.seed());
+      Long num_rows = getNumRows();
+      byte[] maskVals = new byte[num_rows.intValue()];
+      for (int i = 0; i < num_rows.intValue(); i++) {
+        maskVals[i] = (byte) bcs.sample();
+      }
+      ColumnVector mask = ColumnVector.boolFromBytes(maskVals);
+      Table filteredTable = table.filter(mask);
+      mask.close();
+      table.close();
+      table = null;
+      table = filteredTable;
+    }
   }
 
   public StructType getSchema() {

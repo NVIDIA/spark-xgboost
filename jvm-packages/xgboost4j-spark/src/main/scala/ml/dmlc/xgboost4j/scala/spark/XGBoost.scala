@@ -29,7 +29,7 @@ import ml.dmlc.xgboost4j.java.{IRabitTracker, Rabit, XGBoostError, XGBoostSparkJ
 import ml.dmlc.xgboost4j.scala.rabit.RabitTracker
 import ml.dmlc.xgboost4j.scala.spark.params.BoosterParams
 import ml.dmlc.xgboost4j.scala.spark.params.LearningTaskParams
-import ml.dmlc.xgboost4j.scala.spark.rapids.PluginUtils
+import ml.dmlc.xgboost4j.scala.spark.rapids.{GpuSampler, PluginUtils}
 import ml.dmlc.xgboost4j.scala.{XGBoost => SXGBoost, _}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.commons.io.FileUtils
@@ -572,7 +572,8 @@ object XGBoost extends Serializable {
       rabitEnv: java.util.Map[String, String],
       checkpointRound: Int,
       prevBooster: Booster,
-      inferNumClass: Boolean = false): RDD[(Booster, Map[String, Array[Float]])] = {
+      inferNumClass: Boolean = false,
+      sampler: Option[GpuSampler] = None): RDD[(Booster, Map[String, Array[Float]])] = {
     val updatedParams = parameterOverrideToUseGPU(params)
     val (nWorkers, _, useExternalMemory, obj, eval, missing, _, _, _, _) =
       parameterFetchAndValidation(updatedParams, sc)
@@ -587,7 +588,7 @@ object XGBoost extends Serializable {
           val (gpuId, paramsWithGpuId) = appendGpuIdToParameters(updatedParams, isLocal)
 
           val watches = Watches.buildWatches(getCacheDirName(useExternalMemory),
-            gpuId, missing, colIndicesForTrain, iter, inferNumClass)
+            gpuId, missing, colIndicesForTrain, iter, inferNumClass, sampler)
           buildDistributedBooster(watches, paramsWithGpuId, rabitEnv, checkpointRound,
             obj, eval, prevBooster)
       }).cache()
@@ -600,7 +601,7 @@ object XGBoost extends Serializable {
           val (gpuId, paramsWithGpuId) = appendGpuIdToParameters(updatedParams, isLocal)
 
           val watches = Watches.buildWatchesWithEval(getCacheDirName(useExternalMemory), gpuId,
-            missing, nameAndColIndices, nameAndColumnBatchIter, inferNumClass)
+            missing, nameAndColIndices, nameAndColumnBatchIter, inferNumClass, sampler)
           buildDistributedBooster(watches, paramsWithGpuId, rabitEnv, checkpointRound,
             obj, eval, prevBooster)
       }.cache()
@@ -616,7 +617,8 @@ object XGBoost extends Serializable {
       trainingData: GDFColumnData,
       params: Map[String, Any],
       evalSetsMap: Map[String, GDFColumnData] = Map(),
-      inferNumClass: Boolean = false): (Booster, Map[String, Array[Float]]) = {
+      inferNumClass: Boolean = false,
+      sampler: Option[GpuSampler] = None): (Booster, Map[String, Array[Float]]) = {
     logger.info(s"Gpu Running XGBoost ${spark.VERSION} with parameters: " +
       s"\n${params.mkString("\n")}")
     // First check and get parameters.
@@ -639,7 +641,8 @@ object XGBoost extends Serializable {
             val parallelismTracker = new SparkParallelismTracker(sc, timeoutRequestWorkers,
               nWorkers)
             val boostersAndMetrics = trainPreferGpu(sc, dataMap, evalSetsMap.isEmpty,
-              overriddenParams, tracker.getWorkerEnvs, checkpointRound, prevBooster, inferNumClass)
+              overriddenParams, tracker.getWorkerEnvs, checkpointRound, prevBooster,
+              inferNumClass, sampler)
             val sparkJobThread = new Thread() {
               override def run() {
                 // force the job
@@ -902,7 +905,8 @@ private object Watches {
   // ========= GPU Pipeline Begin =============
   // Suppose "indices" are given in this order <features, label, weight, group>
   private def buildDMatrixIncrementally(gpuId: Int, missing: Float, indices: Seq[Array[Int]],
-      iter: Iterator[Table], inferNumClass: Boolean = false): (DMatrix, Double) = {
+      iter: Iterator[Table], inferNumClass: Boolean = false, sampler: Option[GpuSampler] = None):
+      (DMatrix, Double) = {
 
     if (!missing.isNaN && missing != 0.0f) {
       throw new RuntimeException(s"you can only specify missing value as 0.0 (the currently" +
@@ -922,7 +926,7 @@ private object Watches {
 
     var max: Double = Double.MinValue
     while (iter.hasNext) {
-      val columnBatch = new GpuColumnBatch(iter.next(), null)
+      val columnBatch = new GpuColumnBatch(iter.next(), null, sampler.getOrElse(null))
       if (isLTR) {
         // Build group info, along with weight info if needed (-1 means no weight)
         val weightIdx = if (hasWeight) weightIndices(0) else -1
@@ -978,9 +982,9 @@ private object Watches {
 
   def buildWatches(cachedDirName: Option[String], gpuId: Int, missing: Float,
       indices: Seq[Array[Int]], iter: Iterator[Table],
-      inferNumClass: Boolean = false): Watches = {
+      inferNumClass: Boolean = false, sampler: Option[GpuSampler] = None): Watches = {
     val ((dm, numClass), time) = PluginUtils.time("Train: Build DMatrix incrementally") {
-      buildDMatrixIncrementally(gpuId, missing, indices, iter, inferNumClass)
+      buildDMatrixIncrementally(gpuId, missing, indices, iter, inferNumClass, sampler)
     }
     logger.debug("Benchmark[Train: Build DMatrix incrementally] " + time)
     if (dm == null) {
@@ -993,14 +997,14 @@ private object Watches {
   def buildWatchesWithEval(cachedDirName: Option[String], gpuId: Int, missing: Float,
       indices: Map[String, Seq[Array[Int]]],
       nameAndGdfColumns: Iterator[(String, Iterator[Table])],
-      inferNumClass: Boolean = false): Watches = {
+      inferNumClass: Boolean = false, sampler: Option[GpuSampler] = None): Watches = {
 
     var numClass: Double = 0.0
     val dms = nameAndGdfColumns.map {
       case (name, iter) => (name, {
         val inferring = inferNumClass && name == "train"
         val ((dm, tmpNumClass), time) = PluginUtils.time(s"Train: Build $name DMatrix") {
-          buildDMatrixIncrementally(gpuId, missing, indices(name), iter, inferring)
+          buildDMatrixIncrementally(gpuId, missing, indices(name), iter, inferring, sampler)
         }
         logger.debug(s"Benchmark[Train build $name DMatrix] " + time)
         if (inferring) {
