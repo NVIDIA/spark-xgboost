@@ -29,8 +29,8 @@ class ColumnBatchToRow {
   private lazy val batchIter = batches.toIterator
   private var currentBatchIter: ColumnBatchIter = null
 
-  def appendColumnBatch(batch: GpuColumnBatch): Unit = {
-    batches = batches :+ new ColumnBatchIter(batch)
+  def appendColumnBatch(batch: GpuColumnBatch, colNameToBuild: Option[String] = None): Unit = {
+    batches = batches :+ new ColumnBatchIter(batch, colNameToBuild)
   }
 
   private[xgboost4j] def toIterator: Iterator[Row] = {
@@ -68,10 +68,13 @@ class ColumnBatchToRow {
     iter
   }
 
-  class ColumnBatchIter(batch: GpuColumnBatch) extends Iterator[Row] with AutoCloseable {
+  class ColumnBatchIter(batch: GpuColumnBatch, colNameToBuild: Option[String] = None) extends
+      Iterator[Row] with AutoCloseable {
     val rawSchema = batch.getSchema
-    val schema = StructType(rawSchema.fields.filter(x =>
-      RowConverter.isSupportingType(x.dataType)))
+    val schema = colNameToBuild.map(name => StructType(rawSchema.fields.filter(x =>
+        RowConverter.isSupportingType(x.dataType) && x.name.equals(name))))
+      .getOrElse(StructType(
+        rawSchema.fields.filter(x => RowConverter.isSupportingType(x.dataType))))
 
     // schema name maps to index of schema
     val nameToIndex = schema.names.map(rawSchema.fieldIndex)
