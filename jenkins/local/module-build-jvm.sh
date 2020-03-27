@@ -26,7 +26,7 @@ MVN_LOCAL_REPO=`mvn exec:exec -q -B --non-recursive \
 fi
 echo "Maven local directory = $MVN_LOCAL_REPO"
 
-#CUDF_VER=0.13-SNAPSHOT
+#get cudf version
 CUDF_VER=`mvn exec:exec -q -B --non-recursive \
     -Dmaven.repo.local=$MVN_LOCAL_REPO \
     -Dexec.executable=echo \
