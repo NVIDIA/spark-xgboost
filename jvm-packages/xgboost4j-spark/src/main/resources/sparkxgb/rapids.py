@@ -31,7 +31,7 @@ class CrossValidator(JavaWrapper, pyspark.ml.tuning.CrossValidator):
         self._java_obj.setEvaluator(java_evaluator)
         self._java_obj.setEstimatorParamMaps(java_epms)
 
-        cv_java_model = self._java_obj.fit(dataset)
+        cv_java_model = self._java_obj.fit(dataset._jdf)
         cv_py_model = CrossValidatorModel._from_java(cv_java_model)
         xgbModel = self.getEstimator()._create_model(cv_java_model.bestModel())
         # return CrossValidatorModel
