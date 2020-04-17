@@ -169,21 +169,4 @@ object DataUtils extends Serializable {
     GDFColumnData(dataFrame, indices, opGroup)
   }
 
-  // This method is running on executor side
-  private[spark] def getGpuId(isLocal: Boolean): Int = {
-    // Call allocateGpuDevice to force assignment of GPU when in exclusive process mode
-    // and pass that as the gpu_id, assumption is that if you are using CUDA_VISIBLE_DEVICES
-    // it doesn't hurt to call allocateGpuDevice so just always do it.
-    var gpuId = 0
-    val context = TaskContext.get()
-    if (!isLocal) {
-      val resources = context.resources()
-      val assignedGpuAddrs = resources.get("gpu").getOrElse(
-        throw new RuntimeException("Spark could not allocate gpus for executor"))
-      gpuId = if (assignedGpuAddrs.addresses.length < 1) {
-        throw new RuntimeException("executor could not get specific address of gpu")
-      } else assignedGpuAddrs.addresses(0).toInt
-    }
-    gpuId
-  }
 }

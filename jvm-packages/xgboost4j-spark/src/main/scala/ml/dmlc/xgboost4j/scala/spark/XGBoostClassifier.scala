@@ -19,7 +19,7 @@ package ml.dmlc.xgboost4j.scala.spark
 import ai.rapids.cudf.Table
 import ml.dmlc.xgboost4j.java.Rabit
 import ml.dmlc.xgboost4j.scala.spark.params._
-import ml.dmlc.xgboost4j.scala.spark.rapids.{GpuSampler, PluginUtils, RowConverter}
+import ml.dmlc.xgboost4j.scala.spark.rapids.{GpuDeviceManager, GpuSampler, PluginUtils, RowConverter}
 import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, EvalTrait, ObjectiveTrait, XGBoost => SXGBoost}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.commons.logging.LogFactory
@@ -396,7 +396,7 @@ class XGBoostClassificationModel private[ml](
     val sc = dataFrame.sparkSession.sparkContext
     val isLocal = sc.isLocal
     val resultRDD = PluginUtils.toColumnarRdd(dataFrame).mapPartitions((iter: Iterator[Table]) => {
-      val gpuId = DataUtils.getGpuId(isLocal)
+      val gpuId = GpuDeviceManager.getGpuId(isLocal)
       logger.info("XGboost transform GPU pipeline using device: " + gpuId)
 
       val ((dm, columnBatchToRow), time) = PluginUtils.time("Transform: build dmatrix and row") {
