@@ -29,7 +29,7 @@ import ml.dmlc.xgboost4j.java.{IRabitTracker, Rabit, XGBoostError, XGBoostSparkJ
 import ml.dmlc.xgboost4j.scala.rabit.RabitTracker
 import ml.dmlc.xgboost4j.scala.spark.params.BoosterParams
 import ml.dmlc.xgboost4j.scala.spark.params.LearningTaskParams
-import ml.dmlc.xgboost4j.scala.spark.rapids.{GpuSampler, PluginUtils}
+import ml.dmlc.xgboost4j.scala.spark.rapids.{GpuDeviceManager, GpuSampler, PluginUtils}
 import ml.dmlc.xgboost4j.scala.{XGBoost => SXGBoost, _}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.commons.io.FileUtils
@@ -557,9 +557,8 @@ object XGBoost extends Serializable {
   // This method is running on executor side
   private def appendGpuIdToParameters(params: Map[String, Any], isLocal: Boolean):
       (Int, Map[String, Any]) = {
-    val gpuId = DataUtils.getGpuId(isLocal)
+    val gpuId = GpuDeviceManager.getGpuId(isLocal)
     logger.info("XGboost GPU training using device: " + gpuId)
-    XGBoostSparkJNI.allocateGpuDevice(gpuId)
     (gpuId, params + ("gpu_id" -> gpuId.toString))
   }
 
