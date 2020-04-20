@@ -53,8 +53,8 @@ class NativeLibLoader {
     String version = EnvironmentDetector
         .getCudaVersion()
         .orElseGet(() -> {
-          logger.info("could not get CUDA version, fall back on version 9.2");
-          return "9.2.0";
+          logger.info("could not get CUDA version, fall back on version 10.1");
+          return "10.1";
         });
     assert version.indexOf('.') + 2 <= version.length(): "cuda version format error!";
     String mainVersion = version.indexOf('.') > 0
