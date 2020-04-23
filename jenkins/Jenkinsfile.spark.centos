@@ -25,10 +25,9 @@ pipeline {
     }
 
     parameters {
+        string(name: 'CUDA_VER', defaultValue: '10.1', description: 'cuda version, 10.1, 10.2')
         string(name: 'REF', defaultValue: '\${gitlabBranch}', description: 'Commit to build')
     }
-
-    environment { CUDF_VERSION='0.12'}
 
     // Build stages
     stages {

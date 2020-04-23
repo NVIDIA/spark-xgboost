@@ -41,7 +41,6 @@ pipeline {
         BUILD_SCRIPT='$LOCAL_ROOT/build-jvm-multi.sh'
         DEPLOY_SCRIPT='$LOCAL_ROOT/deploy-jvm-multi.sh'
         SERVER_URL = "${SERVERS_MAP."$DEPLOY_TYPE"}"
-        CUDF_VERSION='0.13'
     }
 
     triggers {
