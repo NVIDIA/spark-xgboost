@@ -39,7 +39,7 @@ buildXgboost4j(){
     CUDA_VER=cuda$1
     CUDF_CLASS=$2
     . /opt/tools/to_$CUDA_VER.sh
-    if [ "$CUDA_VER" == cuda10.0 ]; then
+    if [ "$CUDA_VER" == cuda10.1 ]; then
         mvn clean package -B -DskipTests $MVN_ARG -Dmaven.repo.local=$MVN_LOCAL_REPO
     else
         mvn dependency:get -B -Dmaven.repo.local=$MVN_LOCAL_REPO -Dtransitive=false \
@@ -56,10 +56,10 @@ buildXgboost4j(){
     fi
 }
 
-####### build xgboost4j .so for and 10.1 ##
-buildXgboost4j 10.1 cuda10-1
+####### build xgboost4j .so for and 10.2 ##
+buildXgboost4j 10.2 cuda10-2
 
-####### build xgboost4j .so for CUDA10.0 and jars ##
-buildXgboost4j 10.0
+####### build xgboost4j .so for CUDA10.1 and jars ##
+buildXgboost4j 10.1
 
 cd $ORIG_PATH

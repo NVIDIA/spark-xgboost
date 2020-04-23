@@ -13,7 +13,13 @@ gcc --version
 BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2 -DskipTests -B -s settings.xml -Pmirror-apache-to-gpuwa"
 
 cd jvm-packages
-. /opt/tools/to_cuda10.0.sh
+if [ "${CUDA_VER}"x == x ];then
+   CUDA_VER="10.1"
+fi
+. /opt/tools/to_cuda${CUDA_VER}.sh
+
+echo "CUDA_VER: $CUDA_VER, BUILD_ARG: $BUILD_ARG"
+
 rm -rf ../build
 mvn $BUILD_ARG clean package
 cd ..

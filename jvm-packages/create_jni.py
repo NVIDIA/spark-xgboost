@@ -75,12 +75,10 @@ if __name__ == "__main__":
 
     cuda_ver = sys.argv[1].lower()
     extra_lib_path = sys.argv[2]
-    if cuda_ver == "cuda9.2":
-        cuda = "cuda9.2"
-    elif cuda_ver == "cuda10.0":
-        cuda = "cuda10.0"
-    elif cuda_ver == "cuda10.1":
+    if cuda_ver == "cuda10.1":
         cuda = "cuda10.1"
+    elif cuda_ver == "cuda10.2":
+        cuda = "cuda10.2"
     else:
         raise Exception("Unsupported cuda version: " + cuda_ver)
 

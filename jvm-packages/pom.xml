@@ -53,12 +53,6 @@
     </modules>
     <profiles>
         <profile>
-            <id>cuda10.0</id>
-            <properties>
-                <cudf.classifier></cudf.classifier>
-            </properties>
-        </profile>
-        <profile>
             <id>local-repo</id>
             <activation>
                 <property>
@@ -327,17 +321,14 @@
                                 def matcher = cudaLine.matcher(standardOut)
                                 if (matcher.find()) {
                                     switch (matcher.group(1)) {
-                                        case ~/10\\.0\\..*/:
-                                            pom.properties['cuda.version'] = 'cuda10.0'
-                                            break;
-                                        case ~/9\\.2\\..*/:
-                                            pom.properties['cuda.version'] = 'cuda9.2'
-                                            break;
 					case ~/10\\.1\\..*/:
 					    pom.properties['cuda.version'] = 'cuda10.1'
 					    break;
+                                        case ~/10\\.2\\..*/:
+                                            pom.properties['cuda.version'] = 'cuda10.2'
+                                            break;
                                         default:
-                                            fail('Could not find a CUDA 9.2, 10.0 or 10.1')
+                                            fail('Could not find a CUDA 10.1 or 10.2')
                                             break;
                                     }
                                 } else {
