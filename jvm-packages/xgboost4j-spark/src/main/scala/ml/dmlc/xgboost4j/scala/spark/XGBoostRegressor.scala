@@ -184,6 +184,26 @@ class XGBoostRegressor (
     copyValues(model).setParent(this)
   }
 
+  private def trainGpu(dataset: Dataset[_]): XGBoostRegressionModel = {
+    if (!isDefined(evalMetric) || $(evalMetric).isEmpty) {
+      set(evalMetric, setupDefaultEvalMetric())
+    }
+
+    if (isDefined(customObj) && $(customObj) != null) {
+      set(objectiveType, "regression")
+    }
+
+    val (_booster, _metrics) = trainHonorGpu(dataset.asInstanceOf[DataFrame])
+    val model = new XGBoostRegressionModel(uid, _booster)
+    val summary = XGBoostTrainingSummary(_metrics)
+    model.setSummary(summary)
+    copyValues(model).setParent(this)
+  }
+
+  override def fit(dataset: Dataset[_]): XGBoostRegressionModel = {
+    if (PluginUtils.isSupportColumnar(dataset)) trainGpu(dataset) else super.fit(dataset)
+  }
+
   override protected def train(dataset: Dataset[_]): XGBoostRegressionModel = {
     if (!isDefined(evalMetric) || $(evalMetric).isEmpty) {
       set(evalMetric, setupDefaultEvalMetric())
@@ -193,34 +213,28 @@ class XGBoostRegressor (
       set(objectiveType, "regression")
     }
 
-    val (_booster, _metrics) = if (PluginUtils.isSupportColumnar) {
-      // Spark plugin for GPU is loaded, go into GPU pipeline
-      trainHonorGpu(dataset.asInstanceOf[DataFrame])
+    val weight = if (!isDefined(weightCol) || $(weightCol).isEmpty) lit(1.0)
+    else col($(weightCol))
+    val baseMargin = if (!isDefined(baseMarginCol) || $(baseMarginCol).isEmpty) {
+      lit(Float.NaN)
     } else {
-      // Others fallback to CPU pipeline
-
-      val weight = if (!isDefined(weightCol) || $(weightCol).isEmpty) lit(1.0)
-      else col($(weightCol))
-      val baseMargin = if (!isDefined(baseMarginCol) || $(baseMarginCol).isEmpty) {
-        lit(Float.NaN)
-      } else {
-        col($(baseMarginCol))
-      }
-      val group = if (!isDefined(groupCol) || $(groupCol).isEmpty) lit(-1) else col($(groupCol))
-      val trainingSet: RDD[XGBLabeledPoint] = DataUtils.convertDataFrameToXGBLabeledPointRDDs(
-        col($(labelCol)), col($(featuresCol)), weight, baseMargin, Some(group),
-        dataset.asInstanceOf[DataFrame]).head
-      val evalRDDMap = getEvalSets(xgboostParams).map {
-        case (name, dataFrame) => (name,
-          DataUtils.convertDataFrameToXGBLabeledPointRDDs(col($(labelCol)), col($(featuresCol)),
-            weight, baseMargin, Some(group), dataFrame).head)
-      }
-      transformSchema(dataset.schema, logging = true)
-      val derivedXGBParamMap = MLlib2XGBoostParams
-      // All non-null param maps in XGBoostRegressor are in derivedXGBParamMap.
-      XGBoost.trainDistributed(trainingSet, derivedXGBParamMap,
-        hasGroup = group != lit(-1), evalRDDMap)
+      col($(baseMarginCol))
     }
+    val group = if (!isDefined(groupCol) || $(groupCol).isEmpty) lit(-1) else col($(groupCol))
+    val trainingSet: RDD[XGBLabeledPoint] = DataUtils.convertDataFrameToXGBLabeledPointRDDs(
+      col($(labelCol)), col($(featuresCol)), weight, baseMargin, Some(group),
+      dataset.asInstanceOf[DataFrame]).head
+    val evalRDDMap = getEvalSets(xgboostParams).map {
+      case (name, dataFrame) => (name,
+        DataUtils.convertDataFrameToXGBLabeledPointRDDs(col($(labelCol)), col($(featuresCol)),
+          weight, baseMargin, Some(group), dataFrame).head)
+    }
+    transformSchema(dataset.schema, logging = true)
+    val derivedXGBParamMap = MLlib2XGBoostParams
+    // All non-null param maps in XGBoostRegressor are in derivedXGBParamMap.
+    val (_booster, _metrics) = XGBoost.trainDistributed(trainingSet, derivedXGBParamMap,
+      hasGroup = group != lit(-1), evalRDDMap)
+
     val model = new XGBoostRegressionModel(uid, _booster)
     val summary = XGBoostTrainingSummary(_metrics)
     model.setSummary(summary)
@@ -241,18 +255,6 @@ class XGBoostRegressor (
     }
     val derivedXGBParamMap = MLlib2XGBoostParams
     XGBoost.trainDistributedPreferGpu(columnData, derivedXGBParamMap, evalRDDMap, false, sampler)
-  }
-
-  protected override def validateAndTransformSchema(
-      schema: StructType,
-      fitting: Boolean,
-      featuresDataType: DataType): StructType = {
-    if (PluginUtils.isSupportColumnar) {
-      // Bypass the column check for GPU pipeline
-      schema
-    } else {
-      super.validateAndTransformSchema(schema, fitting, featuresDataType)
-    }
   }
 
   override def copy(extra: ParamMap): XGBoostRegressor = defaultCopy(extra)
@@ -546,7 +548,7 @@ class XGBoostRegressionModel private[ml] (
   }
 
   override def transform(dataset: Dataset[_]): DataFrame = {
-    val isSupportColumnar = PluginUtils.isSupportColumnar
+    val isSupportColumnar = PluginUtils.isSupportColumnar(dataset)
     if (!isSupportColumnar) {
       transformSchema(dataset.schema, logging = true)
     }
