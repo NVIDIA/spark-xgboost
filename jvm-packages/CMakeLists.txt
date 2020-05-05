@@ -12,7 +12,6 @@ target_include_directories(xgboost4j
   PRIVATE
   ${JNI_INCLUDE_DIRS}
   ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
-  ${CUDF_INCLUDE_DIR}
   ${PROJECT_SOURCE_DIR}/jvm-packages/xgboost4j/src/native
   ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/dmlc-core/include
@@ -25,6 +24,5 @@ set_target_properties(
   CXX_STANDARD_REQUIRED ON)
 target_link_libraries(xgboost4j
   PRIVATE
-  ${CUDF_LIBRARY}
   ${LINKED_LIBRARIES_PRIVATE}
   ${JAVA_JVM_LIBRARY})

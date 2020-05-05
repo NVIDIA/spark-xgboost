@@ -190,26 +190,28 @@ int XGDMatrixCreateFromDataIter(
 }
 
 #ifdef XGBOOST_USE_CUDF
-int XGDMatrixCreateFromCUDF
-(column_view **cols, size_t n_cols, DMatrixHandle *out, int gpu_id, bst_float missing) {
+XGB_DLL int XGDMatrixCreateFromCUDF(std::vector<gpu_column_data *> const& cols,
+                            DMatrixHandle *out,
+                            int gpu_id,
+                            float missing) {
   API_BEGIN();
   std::unique_ptr<data::SimpleCSRSource> source(new data::SimpleCSRSource());
-  source->InitFromCUDF(cols, n_cols, gpu_id, missing);
+  source->InitFromCUDF(cols, gpu_id, missing);
   *out = new std::shared_ptr<DMatrix>(DMatrix::Create(std::move(source)));
   API_END();
 }
 
-int XGDMatrixAppendCUDF
-(column_view **cols, size_t n_cols, DMatrixHandle handle, int gpu_id, bst_float missing) {
+XGB_DLL int XGDMatrixAppendCUDF(std::vector<gpu_column_data *> const& cols, DMatrixHandle handle,
+    int gpu_id, bst_float missing) {
   API_BEGIN();
   CHECK_HANDLE();
   auto dmat = static_cast<std::shared_ptr<DMatrix>*>(handle);
   MetaInfo &info = (*dmat)->Info();
-  CHECK_EQ(info.num_col_, n_cols);
+  CHECK_EQ(info.num_col_, cols.size());
 
   // Create a new sparse page and append it to the existing one
   std::unique_ptr<data::SimpleCSRSource> source(new data::SimpleCSRSource());
-  source->InitFromCUDF(cols, n_cols, gpu_id, missing);
+  source->InitFromCUDF(cols, gpu_id, missing);
 
   size_t batch_count = 0;
   for (auto &batch : (*dmat)->GetRowBatches()) {
@@ -221,6 +223,7 @@ int XGDMatrixAppendCUDF
   // Update the meta info
   info.num_row_ += source->info.num_row_;
   info.num_nonzero_ += source->info.num_nonzero_;
+
   API_END();
 }
 #endif
@@ -728,25 +731,23 @@ XGB_DLL int XGDMatrixSetFloatInfo(DMatrixHandle handle,
 #ifdef XGBOOST_USE_CUDF
 XGB_DLL int XGDMatrixSetCUDFInfo(DMatrixHandle handle,
                                 const char *field,
-                                column_view **cols,
-                                size_t n_cols,
+                                 std::vector<gpu_column_data *> const& cols,
                                 int gpu_id) {
   API_BEGIN();
   CHECK_HANDLE();
   static_cast<std::shared_ptr<DMatrix>*>(handle)
-    ->get()->Info().SetCUDFInfo(field, cols, n_cols, gpu_id);
+    ->get()->Info().SetCUDFInfo(field, cols, gpu_id);
   API_END();
 }
 
 XGB_DLL int XGDMatrixAppendCUDFInfo(DMatrixHandle handle,
                                     const char *field,
-                                    column_view **cols,
-                                    size_t n_cols,
+                                    std::vector<gpu_column_data *> const& cols,
                                     int gpu_id) {
   API_BEGIN();
   CHECK_HANDLE();
   static_cast<std::shared_ptr<DMatrix>*>(handle)
-    ->get()->Info().AppendCUDFInfo(field, cols, n_cols, gpu_id);
+    ->get()->Info().AppendCUDFInfo(field, cols, gpu_id);
   API_END();
 }
 #endif

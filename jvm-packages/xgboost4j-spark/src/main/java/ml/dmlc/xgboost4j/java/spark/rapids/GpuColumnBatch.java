@@ -16,16 +16,19 @@
 
 package ml.dmlc.xgboost4j.java.spark.rapids;
 
+import java.util.Arrays;
 import java.util.List;
 
 import ai.rapids.cudf.ColumnVector;
 import ai.rapids.cudf.DType;
+import ai.rapids.cudf.GpuColumnVectorUtils;
 import ai.rapids.cudf.HostColumnVector;
 import ai.rapids.cudf.Table;
 
 import org.apache.spark.sql.types.*;
 import org.apache.spark.util.random.BernoulliCellSampler;
 
+import ml.dmlc.xgboost4j.java.rapids.ColumnData;
 import ml.dmlc.xgboost4j.scala.spark.rapids.GpuSampler;
 
 public class GpuColumnBatch {
@@ -239,5 +242,21 @@ public class GpuColumnBatch {
       return DType.STRING; // TODO what do we want to do about STRING_CATEGORY???
     }
     return null;
+  }
+
+  public ColumnData[] getAsColumnData(int... indices) {
+    if (indices == null || indices.length == 0) return new ColumnData[]{};
+    return Arrays.stream(indices)
+      .mapToObj(indice -> getColumnVector((int) indice))
+      .map(GpuColumnVectorUtils::getColumnData)
+      .toArray(ColumnData[]::new);
+  }
+
+  public ColumnData[] getAsColumnData(long... indices) {
+    if (indices == null || indices.length == 0) return new ColumnData[]{};
+    return Arrays.stream(indices)
+      .mapToObj(indice -> getColumnVector((int) indice))
+      .map(GpuColumnVectorUtils::getColumnData)
+      .toArray(ColumnData[]::new);
   }
 }

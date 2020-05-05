@@ -79,7 +79,6 @@ class ColumnBatchToRow {
     // schema name maps to index of schema
     val nameToIndex = schema.names.map(rawSchema.fieldIndex)
 
-    val nativeColumnPtrs = nameToIndex.map(batch.getColumn)
     val timeUnits = nameToIndex.map(batch.getColumnVector(_).getType())
 
     private val numRows = batch.getNumRows
@@ -109,7 +108,8 @@ class ColumnBatchToRow {
     }
 
     private def initBuffer(): Long = {
-      XGBoostSparkJNI.buildUnsafeRows(nativeColumnPtrs)
+      val colDatas = batch.getAsColumnData(nameToIndex: _*)
+      XGBoostSparkJNI.buildUnsafeRows(colDatas: _*)
     }
   }
 }
