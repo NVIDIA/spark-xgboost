@@ -37,7 +37,7 @@ node('docker-deploy') {
         stage ('Build XGBoost on Centos7') {
             def IMAGE_NAME="xgbci/xgboost:xgb3-dev-centos7"
             sh "docker pull $IMAGE_NAME"
-            docker.image(IMAGE_NAME).inside("--runtime=nvidia -u root") {
+            docker.image(IMAGE_NAME).inside("--runtime=nvidia") {
                 sh "scl enable devtoolset-7 '$BUILD_SCRIPT ${secInfo[3]}'"
             }
         }
