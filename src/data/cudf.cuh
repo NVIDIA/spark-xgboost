@@ -2,39 +2,35 @@
  * Copyright 2018 by xgboost contributors
  */
 
-#include <cudf/types.hpp>
-
 namespace xgboost {
 namespace data {
-
-using cudf::type_id; 
 
 /**
  * Convert the data element into a common format
  */
-__device__ inline float ConvertDataElement(void const* data, int tid, type_id dtype) {
+__device__ inline float ConvertDataElement(void const* data, int tid, int dtype) {
   switch(dtype) {
-    case type_id::INT8: {
+    case 1: {
       int8_t * d = (int8_t*)data;
       return float(d[tid]);
     }
-    case type_id::INT16: {
+    case 2: {
       int16_t * d = (int16_t*)data;
       return float(d[tid]);
     }
-    case type_id::INT32: {
+    case 3: {
       int32_t * d = (int32_t*)data;
       return float(d[tid]);
     }
-    case type_id::INT64: {
+    case 4: {
       int64_t * d = (int64_t*)data;
       return float(d[tid]);
     }
-    case type_id::FLOAT32: {
+    case 5: {
       float * d = (float *)data;
       return float(d[tid]);
     }
-    case type_id::FLOAT64: {
+    case 6: {
       double * d = (double *)data;
       return float(d[tid]);
     }

@@ -18,7 +18,8 @@ package ml.dmlc.xgboost4j.scala
 
 import _root_.scala.collection.JavaConverters._
 import ml.dmlc.xgboost4j.LabeledPoint
-import ml.dmlc.xgboost4j.java.{DMatrix => JDMatrix, DataBatch, XGBoostError}
+import ml.dmlc.xgboost4j.java.rapids.ColumnData
+import ml.dmlc.xgboost4j.java.{DataBatch, XGBoostError, DMatrix => JDMatrix}
 
 class DMatrix private[scala](private[scala] val jDMatrix: JDMatrix) {
 
@@ -100,53 +101,52 @@ class DMatrix private[scala](private[scala] val jDMatrix: JDMatrix) {
 
   /**
    * create DMatrix from CUDF
-   * @param data native handles of GDF columns
+   * @param cds ColumnData
    * @param gpuId gpu id to use
    * @param missing missing value
    * @throws ml.dmlc.xgboost4j.java.XGBoostError
    */
   @throws(classOf[XGBoostError])
-  def this(data: Array[Long], gpuId: Int, missing: Float) {
-    this(new JDMatrix(data, gpuId, missing))
+  def this(gpuId: Int, missing: Float, cds: ColumnData*) {
+    this(new JDMatrix(gpuId, missing, cds: _*))
   }
 
   /**
    * create DMatrix from CUDF
-   * @param data native handles of GDF columns
    * @throws ml.dmlc.xgboost4j.java.XGBoostError
    */
   @throws(classOf[XGBoostError])
-  def this(data: Array[Long]) {
-    this(data, 0, 0.0f)
+  def this(cds: ColumnData*) {
+    this(0, 0.0f, cds: _*)
   }
 
   /**
     * Append CUDF to dmatrix
-    * @param cols native handles of GDF columns
+    * @param cds ColumnDatas
     */
   @throws(classOf[XGBoostError])
-  def appendCUDF(cols: Array[Long]): Unit = {
-    jDMatrix.appendCUDF(cols)
+  def appendCUDF(cds: ColumnData*): Unit = {
+    jDMatrix.appendCUDF(cds: _*)
   }
 
   /**
    * set CUDF info of dmatrix
    * @param field label or feature
-   * @param cols native handles of GDF columns
+   * @param cds ColumnDatas
    */
   @throws(classOf[XGBoostError])
-  def setCUDFInfo(field: String, cols: Array[Long]): Unit = {
-    jDMatrix.setCUDFInfo(field, cols)
+  def setCUDFInfo(field: String, cds: ColumnData*): Unit = {
+    jDMatrix.setCUDFInfo(field, cds: _*)
   }
 
   /**
     * set CUDF info of dmatrix
     * @param field label or feature
-    * @param cols native handles of GDF columns
+    * @param cds ColumnDatas
     */
   @throws(classOf[XGBoostError])
-  def appendCUDFInfo(field: String, cols: Array[Long]): Unit = {
-    jDMatrix.appendCUDFInfo(field, cols)
+  def appendCUDFInfo(field: String, cds: ColumnData*): Unit = {
+    jDMatrix.appendCUDFInfo(field, cds: _*)
   }
 
   /**

@@ -16,9 +16,10 @@
 
 package ml.dmlc.xgboost4j.java;
 
-import ai.rapids.cudf.NativeDepsLoader;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+
+import ml.dmlc.xgboost4j.java.rapids.ColumnData;
 
 /**
  * JNI functions for XGBoost4J-Spark
@@ -28,8 +29,6 @@ public class XGBoostSparkJNI {
 
   static {
     try {
-      logger.info("load cuDF libs");
-      NativeDepsLoader.libraryLoaded();
       logger.info("load XGBoost libs");
       NativeLibLoader.initXGBoost();
     } catch (Exception ex) {
@@ -38,14 +37,33 @@ public class XGBoostSparkJNI {
     }
   }
 
+  public static long buildUnsafeRows(final ColumnData... cds) {
+    if (cds == null || cds.length <= 0) return 0L;
+    long[] dataPtrs  = new long[cds.length];
+    long[] validPtrs = new long[cds.length];
+    int[] dTypeSizes = new int[cds.length];
+    int i = 0;
+    for(ColumnData cd: cds) {
+      dataPtrs[i]  = cd.getDataPtr();
+      validPtrs[i] = cd.getValidPtr();
+      dTypeSizes[i] = cd.getTypeSize();
+      i++;
+    }
+    return buildUnsafeRows(dataPtrs, validPtrs, dTypeSizes, cds[0].getShape());
+  }
+
   /**
    * Build an array of fixed-length Spark UnsafeRow using the GPU.
-   * @param nativeColumnPtrs native address of cudf column pointers
+   * @param dataPtrs native address of cudf column data pointers
+   * @param validPtrs native address of cudf column valid pointers
+   * @param dTypeSizes type size
+   * @param rows number of rows
    * @return native address of the UnsafeRow array
    * NOTE: It is the responsibility of the caller to free the native memory
    *       returned by this function (e.g.: using Platform.freeMemory).
    */
-  public static native long buildUnsafeRows(long[] nativeColumnPtrs);
+  private static native long buildUnsafeRows(long[] dataPtrs, long[] validPtrs,
+                                             int[] dTypeSizes, long rows);
 
   public static native int getGpuDevice();
 

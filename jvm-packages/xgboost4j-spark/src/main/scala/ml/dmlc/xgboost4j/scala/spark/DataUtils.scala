@@ -16,7 +16,7 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
-import ai.rapids.cudf.Table
+import ai.rapids.cudf.{GpuColumnVectorUtils, Table}
 import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 import ml.dmlc.xgboost4j.scala.DMatrix
 import ml.dmlc.xgboost4j.scala.spark.rapids.{ColumnBatchToRow, GpuSampler, PluginUtils}
@@ -119,12 +119,11 @@ object DataUtils extends Serializable {
 
     while (iter.hasNext) {
       val columnBatch = new GpuColumnBatch(iter.next(), schema, sampler.getOrElse(null))
-      val features_ = Array(featureIndices.map(columnBatch.getColumn): _*)
       if (isFirstBatch) {
         isFirstBatch = false
-        dm = new DMatrix(features_, gpuId, missing)
+        dm = new DMatrix(gpuId, missing, columnBatch.getAsColumnData(featureIndices: _*): _*)
       } else {
-        dm.appendCUDF(features_)
+        dm.appendCUDF(columnBatch.getAsColumnData(featureIndices: _*): _*)
       }
       columnBatchToRow.appendColumnBatch(columnBatch, colNameToBuild)
       columnBatch.close()

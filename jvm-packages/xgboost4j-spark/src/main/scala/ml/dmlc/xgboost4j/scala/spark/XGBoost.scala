@@ -915,7 +915,8 @@ private object Watches {
 
     var isFirstBunch = true
     var dm: DMatrix = null
-    val (weightIndices, groupIndices) = (indices(2), indices(3))
+    val (featuresIndices, labelIndices, weightIndices, groupIndices) = (indices(0), indices(1),
+      indices(2), indices(3))
     val hasWeight = weightIndices.nonEmpty
     // For LTR
     val groupInfo = new mutable.ArrayBuffer[java.lang.Integer]
@@ -933,32 +934,28 @@ private object Watches {
           groupInfo.asJava, weightInfo.asJava)
       }
 
-      // Transform indices to native handles for (features, label)
-      val gdfColsHandles = indices.take(2).map(_.map(columnBatch.getColumn))
-      val (features_, label_) = (gdfColsHandles.head, gdfColsHandles(1))
       // Weight is set differently from LTR to non-LTR.
       // GPU column handle is used for non-LTR, but cpu "Array[Float]" is used for LTR to support
       // chunk loading.
-      val weight_ = if (isLTR) Array.emptyLongArray else weightIndices.map(columnBatch.getColumn)
       // Build DMatrix
       if (isFirstBunch) {
         isFirstBunch = false
-        dm = new DMatrix(features_, gpuId, missingValue)
-        dm.setCUDFInfo("label", label_)
-        if (weight_.nonEmpty) {
-          dm.setCUDFInfo("weight", weight_)
+        dm = new DMatrix(gpuId, missingValue, columnBatch.getAsColumnData(featuresIndices: _*): _*)
+        dm.setCUDFInfo("label", columnBatch.getAsColumnData(labelIndices: _*): _*)
+        if (hasWeight) {
+          dm.setCUDFInfo("weight", columnBatch.getAsColumnData(weightIndices: _*): _*)
         }
       } else {
-        dm.appendCUDF(features_)
-        dm.appendCUDFInfo("label", label_)
-        if (weight_.nonEmpty) {
-          dm.appendCUDFInfo("weight", weight_)
+        dm.appendCUDF(columnBatch.getAsColumnData(featuresIndices: _*): _*)
+        dm.appendCUDFInfo("label", columnBatch.getAsColumnData(labelIndices: _*): _*)
+        if (hasWeight) {
+          dm.appendCUDFInfo("weight", columnBatch.getAsColumnData(weightIndices: _*): _*)
         }
       }
 
       if (inferNumClass) {
         // calculate max label to reduce
-        indices(1).foreach(index => {
+        labelIndices.foreach(index => {
           val scalar = columnBatch.getColumnVector(index).max
           if (scalar.isValid) {
             val tmp = scalar.getDouble
