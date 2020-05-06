@@ -16,7 +16,7 @@ stashJars(){
 }
 
 BUILD_MODULE=$WORKSPACE/jenkins/local/module-build-jvm.sh
-BUILD_ARG="-DskipTests -s settings.xml -Pmirror-apache-to-gpuwa"
+BUILD_ARG="-s settings.xml -Pmirror-apache-to-gpuwa"
 
 SIGN_FILE=$1 && echo "Sign Jar?: $SIGN_FILE"
 if [ "$SIGN_FILE" == true ]; then
@@ -25,7 +25,7 @@ if [ "$SIGN_FILE" == true ]; then
 fi
 
 ###### Build jars ##
-. $BUILD_MODULE "$BUILD_ARG" "$WORKSPACE/.m2"
+. $BUILD_MODULE $BUILD_ARG
 
 ###### Stash jars ##
 stashJars xgboost4j

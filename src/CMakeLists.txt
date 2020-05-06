@@ -57,8 +57,6 @@ if (USE_CUDA)
   endif (USE_NCCL)
   
   if (USE_CUDF)
-    find_package(CUDF REQUIRED)
-    include_directories(${CUDF_INCLUDE_DIR})
     add_definitions(-DXGBOOST_USE_CUDF)
   endif (USE_CUDF)
 

@@ -70,11 +70,10 @@ def normpath(path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        raise Exception("Usage: create_jni.py <cuda version> <extra lib path>")
+    if len(sys.argv) < 2:
+        raise Exception("Usage: create_jni.py <cuda version>")
 
     cuda_ver = sys.argv[1].lower()
-    extra_lib_path = sys.argv[2]
     if cuda_ver == "cuda10.1":
         cuda = "cuda10.1"
     elif cuda_ver == "cuda10.2":
@@ -103,10 +102,7 @@ if __name__ == "__main__":
                 maybe_parallel_build = ""
 
             args = ["-D{0}:BOOL={1}".format(k, v) for k, v in CONFIG.items()]
-            cmd_env_setup = "export CMAKE_LIBRARY_PATH=%s && \
-                             export CMAKE_INCLUDE_PATH=%s && "\
-                             % (extra_lib_path, extra_lib_path)
-            run(cmd_env_setup + "cmake .. " + " ".join(args) + maybe_generator)
+            run("cmake .. " + " ".join(args) + maybe_generator)
             run("cmake --build . --config Release" + maybe_parallel_build)
 
         with cd("demo/regression"):
