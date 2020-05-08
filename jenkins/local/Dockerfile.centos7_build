@@ -72,12 +72,11 @@ RUN conda init --all && \
 RUN git config --system user.name ci && \
     git config --system user.email ci@github.com && \
     ln -s cuda-10.1 /usr/local/cuda && \
-    ln -s nccl_2.4.7-1+${CUDA_B}_x86_64 /usr/local/nccl
+    ln -s nccl_2.4.7-1+${CUDA_A}_x86_64 /usr/local/nccl
 ENV JAVA_HOME=/opt/conda
 ENV NCCL_ROOT=/usr/local/nccl
 
 # add tools to switch between envs
-ADD centos7_to_cuda10.2.sh /opt/tools/to_cuda10.2.sh
-ADD centos7_to_cuda10.1.sh /opt/tools/to_cuda10.1.sh
+ADD to_cudaver.sh /opt/tools/to_cudaver.sh
 
 RUN chmod 777 /usr/local
