@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from contextlib import contextmanager
+from cudautils import cudaver
 
 
 # Monkey-patch the API inconsistency between Python2.X and 3.X.
@@ -70,23 +71,13 @@ def normpath(path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        raise Exception("Usage: create_jni.py <cuda version>")
-
-    cuda_ver = sys.argv[1].lower()
-    if cuda_ver == "cuda10.1":
-        cuda = "cuda10.1"
-    elif cuda_ver == "cuda10.2":
-        cuda = "cuda10.2"
-    else:
-        raise Exception("Unsupported cuda version: " + cuda_ver)
-
     if sys.platform == "darwin":
         # Enable of your compiler supports OpenMP.
         CONFIG["USE_OPENMP"] = "OFF"
         os.environ["JAVA_HOME"] = subprocess.check_output(
             "/usr/libexec/java_home").strip().decode()
 
+    cuda = cudaver()
     print("building Java wrapper on " + cuda)
     with cd(".."):
         maybe_makedirs("build")

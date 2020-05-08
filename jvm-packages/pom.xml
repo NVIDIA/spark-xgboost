@@ -299,47 +299,6 @@
         </resources>
         <plugins>
             <plugin>
-                <groupId>org.codehaus.gmaven</groupId>
-                <artifactId>gmaven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>setProperties</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>execute</goal>
-                        </goals>
-                        <configuration>
-                            <source>
-                                def standardOut = new StringBuffer()
-                                def standardErr = new StringBuffer()
-
-                                def process = 'nvcc --version'.execute()
-                                process.consumeProcessOutput(standardOut, standardErr)
-                                process.waitForOrKill(10000)
-
-                                def cudaLine = ~/Cuda compilation tools, release [.0-9]+, V([.0-9]+)/
-                                def matcher = cudaLine.matcher(standardOut)
-                                if (matcher.find()) {
-                                    switch (matcher.group(1)) {
-					case ~/10\\.1\\..*/:
-					    pom.properties['cuda.version'] = 'cuda10.1'
-					    break;
-                                        case ~/10\\.2\\..*/:
-                                            pom.properties['cuda.version'] = 'cuda10.2'
-                                            break;
-                                        default:
-                                            fail('Could not find a CUDA 10.1 or 10.2')
-                                            break;
-                                    }
-                                } else {
-                                    fail("Could not find CUDA: $standardOut $standardErr")
-                                }
-                            </source>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
             </plugin>

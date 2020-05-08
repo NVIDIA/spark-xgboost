@@ -8,29 +8,29 @@
 #
 ###
 
-ORIG_PATH=`pwd`
-MVN_ARGS=$@
-echo "MVN_ARG: " $MVN_ARGS
+MVN_EXTRA_ARGS=$@
+echo "MVN_ARG: " $MVN_EXTRA_ARGS
+WD=$WORKSPACE
+MVN="mvn -B -Dmaven.repo.local=$WD/.m2 -DskipTests"
+CUDA_UTIL=$WD/jvm-packages/cudautils.py
 
-## Suppose called under jvm-packages
-buildXgboost4j(){
+SUPPORTED_VERS=(`$CUDA_UTIL l`)
+NUM_VERS=${#SUPPORTED_VERS[@]}
+echo "Supported cuda version: ${SUPPORTED_VERS[@]}"
+
+cd $WD/jvm-packages/
+
+for ((i=$NUM_VERS-1;i>=0;i--)); do
+    CU_VER=${SUPPORTED_VERS[i]}
+    . /opt/tools/to_cudaver.sh $CU_VER
     rm -rf ../build
-    CUDA_VER=cuda$1
-    . /opt/tools/to_$CUDA_VER.sh
-    if [ "$CUDA_VER" == 'cuda10.1' ]; then
-        mvn clean package -B -DskipTests -Dmaven.repo.local=$WORKSPACE/.m2 $MVN_ARG
+    if [ $i -gt 0 ]; then
+        ./create_jni.py
     else
-        ./create_jni.py $CUDA_VER
+        CLASSIFIER=`$CUDA_UTIL g`
+        $MVN clean package -Dcudf.classifier=$CLASSIFIER $MVN_EXTRA_ARGS
     fi
-}
+done
 
-cd $WORKSPACE/jvm-packages
-
-####### build xgboost4j .so for and 10.2 ##
-buildXgboost4j 10.2
-
-####### build xgboost4j .so for CUDA10.1 and jars ##
-buildXgboost4j 10.1
-
-cd $ORIG_PATH
+cd $WD
 

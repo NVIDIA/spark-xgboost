@@ -12,14 +12,16 @@ gcc --version
 
 BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2 -DskipTests -B -s settings.xml -Pmirror-apache-to-gpuwa"
 
-cd jvm-packages
-if [ "${CUDA_VER}"x == x ];then
-   CUDA_VER="10.1"
+if [ "${CUDA_VER}"x != x ];then
+   . /opt/tools/to_cudaver.sh $CUDA_VER
 fi
-. /opt/tools/to_cuda${CUDA_VER}.sh
-
 echo "CUDA_VER: $CUDA_VER, BUILD_ARG: $BUILD_ARG"
 
+CUDA_UTIL=$WORKSPACE/jvm-packages/cudautils.py
+# Use the default cuda version in docker image, get the related classifier
+CLASSIFIER=`$CUDA_UTIL g`
+
+cd jvm-packages
 rm -rf ../build
-mvn $BUILD_ARG clean package
+mvn $BUILD_ARG clean package -Dcudf.classifier=$CLASSIFIER
 cd ..

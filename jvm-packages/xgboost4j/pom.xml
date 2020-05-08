@@ -70,6 +70,29 @@
               <version>1.6.0</version>
               <executions>
                   <execution>
+                      <id>version-check</id>
+                      <phase>validate</phase>
+                      <goals>
+                          <goal>exec</goal>
+                      </goals>
+                  </execution>
+              </executions>
+              <configuration>
+                  <executable>python</executable>
+                  <arguments>
+                      <argument>cudautils.py</argument>
+                      <argument>c</argument>
+                      <argument>${cudf.classifier}</argument>
+                  </arguments>
+                  <workingDirectory>${user.dir}</workingDirectory>
+              </configuration>
+          </plugin>
+          <plugin>
+              <artifactId>exec-maven-plugin</artifactId>
+              <groupId>org.codehaus.mojo</groupId>
+              <version>1.6.0</version>
+              <executions>
+                  <execution>
                       <id>native</id>
                       <phase>generate-sources</phase>
                       <goals>
@@ -79,7 +102,6 @@
                           <executable>python</executable>
                           <arguments>
                             <argument>create_jni.py</argument>
-                            <argument>${cuda.version}</argument>
                           </arguments>
                           <workingDirectory>${user.dir}</workingDirectory>
                       </configuration>
