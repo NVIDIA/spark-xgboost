@@ -30,6 +30,6 @@ public class GpuColumnVectorUtils {
     DType dType = columnVector.getType();
 
     return new ColumnData(dataBuffer.getAddress(), columnVector.getRowCount(), validPtr,
-        dType.sizeInBytes, dType.nativeId, columnVector.getNullCount());
+        dType.getSizeInBytes(), dType.getNativeId(), columnVector.getNullCount());
   }
 }
