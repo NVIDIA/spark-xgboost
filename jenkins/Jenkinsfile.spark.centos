@@ -24,6 +24,10 @@ pipeline {
         gitLabConnection('GitLab Master')
     }
 
+    environment {
+        QUAY = credentials("svcngcc_quayio")
+    }
+
     parameters {
         string(name: 'CUDA_VER', defaultValue: '10.1', description: 'cuda version, 10.1, 10.2')
         string(name: 'REF', defaultValue: '\${gitlabBranch}', description: 'Commit to build')
@@ -47,8 +51,13 @@ pipeline {
             steps {
                 unstash name: 'srcs'
                 script {
-                    def IMAGE_NAME="xgbci/xgboost:xgb3-dev-centos7"
-                    sh "docker pull $IMAGE_NAME"
+                    def IMAGE_NAME="quay.io/nvidia/spark:xgb3-dev-centos7"
+                    def DOCKER_CMD="docker --config $WORKSPACE/.docker"
+                    sh """
+                        echo $QUAY_PSW | $DOCKER_CMD login https://quay.io -u $QUAY_USR --password-stdin
+                        $DOCKER_CMD pull $IMAGE_NAME
+                        $DOCKER_CMD logout https://quay.io
+                    """
                     docker.image(IMAGE_NAME).inside("--runtime=nvidia \
                         -v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro") {
                         sh 'scl enable devtoolset-7 jenkins/local/build-jvm-premerge.sh'

@@ -41,6 +41,7 @@ pipeline {
         BUILD_SCRIPT='$LOCAL_ROOT/build-jvm-multi.sh'
         DEPLOY_SCRIPT='$LOCAL_ROOT/deploy-jvm-multi.sh'
         SERVER_URL = "${SERVERS_MAP."$DEPLOY_TYPE"}"
+        QUAY = credentials("svcngcc_quayio")
     }
 
     triggers {
@@ -70,8 +71,13 @@ pipeline {
             steps {
                 unstash name: 'srcs'
                 script {
-                    def IMAGE_NAME="xgbci/xgboost:xgb3-dev-centos7"
-                    sh "docker pull $IMAGE_NAME"
+                    def IMAGE_NAME="quay.io/nvidia/spark:xgb3-dev-centos7"
+                    def DOCKER_CMD="docker --config $WORKSPACE/.docker"
+                    sh """
+                        echo $QUAY_PSW | $DOCKER_CMD login https://quay.io -u $QUAY_USR --password-stdin
+                        $DOCKER_CMD pull $IMAGE_NAME
+                        $DOCKER_CMD logout https://quay.io
+                    """
                     docker.image(IMAGE_NAME).inside("--runtime=nvidia \
                         -v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro") {
                         sh "scl enable devtoolset-7 '$BUILD_SCRIPT $SIGN_FILE' "
