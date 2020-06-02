@@ -25,7 +25,7 @@ pipeline {
     }
 
     environment {
-        QUAY = credentials("svcngcc_quayio")
+        URM_CREDS = credentials("svcngcc_artifactory")
     }
 
     parameters {
@@ -51,12 +51,12 @@ pipeline {
             steps {
                 unstash name: 'srcs'
                 script {
-                    def IMAGE_NAME="quay.io/nvidia/spark:xgb3-dev-centos7"
+                    def IMAGE_NAME="urm.nvidia.com/sw-spark-docker/xgboost:dev3-centos7"
                     def DOCKER_CMD="docker --config $WORKSPACE/.docker"
                     sh """
-                        echo $QUAY_PSW | $DOCKER_CMD login https://quay.io -u $QUAY_USR --password-stdin
+                        echo $URM_CREDS_PSW | $DOCKER_CMD login https://urm.nvidia.com -u $URM_CREDS_USR --password-stdin
                         $DOCKER_CMD pull $IMAGE_NAME
-                        $DOCKER_CMD logout https://quay.io
+                        $DOCKER_CMD logout https://urm.nvidia.com
                     """
                     docker.image(IMAGE_NAME).inside("--runtime=nvidia \
                         -v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro") {
