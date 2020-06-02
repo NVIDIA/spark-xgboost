@@ -27,7 +27,7 @@ node('docker-deploy') {
         'LOCAL_ROOT=jenkins/local',
         'BUILD_SCRIPT=$LOCAL_ROOT/build-jvm-multi.sh',
         'DEPLOY_SCRIPT=$LOCAL_ROOT/deploy-jvm-multi.sh',
-        'IMAGE_NAME=quay.io/nvidia/spark:xgb3-dev-centos7'
+        'IMAGE_NAME=urm.nvidia.com/sw-spark-docker/xgboost:dev3-centos7'
     ]) {
         def secInfo = params.DEPLOY_SERVER == 'Sonatype' ?
             ['rapids-gpg-private-key', 'rapids-gpg-passphrase', 'sonatype-username-password', 'true'] :
@@ -36,13 +36,13 @@ node('docker-deploy') {
         sh "rm -rf $OUT"
 
         stage ('Build XGBoost on Centos7') {
-            withCredentials([usernamePassword(credentialsId: "svcngcc_quayio",
-                            passwordVariable: 'QUAY_PSW', usernameVariable: 'QUAY_USR')]) {
+            withCredentials([usernamePassword(credentialsId: "svcngcc_artifactory",
+                            passwordVariable: 'URM_CREDS_PSW', usernameVariable: 'URM_CREDS_USR')]) {
                 def DOCKER_CMD="docker --config $WORKSPACE/.docker"
                 sh """
-                    echo ${env.QUAY_PSW} | $DOCKER_CMD login https://quay.io -u ${env.QUAY_USR} --password-stdin
+                    echo ${env.URM_CREDS_PSW} | $DOCKER_CMD login https://urm.nvidia.com -u ${env.URM_CREDS_USR} --password-stdin
                     $DOCKER_CMD pull $IMAGE_NAME
-                    $DOCKER_CMD logout https://quay.io
+                    $DOCKER_CMD logout https://urm.nvidia.com
                 """
             }
             docker.image(IMAGE_NAME).inside("--runtime=nvidia") {
