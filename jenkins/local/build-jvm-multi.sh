@@ -16,7 +16,7 @@ stashJars(){
 }
 
 BUILD_MODULE=$WORKSPACE/jenkins/local/module-build-jvm.sh
-BUILD_ARG="-s settings.xml -Pmirror-apache-to-gpuwa"
+BUILD_ARG="-s settings.xml -Pmirror-apache-to-urm"
 
 SIGN_FILE=$1 && echo "Sign Jar?: $SIGN_FILE"
 if [ "$SIGN_FILE" == true ]; then
