@@ -10,7 +10,7 @@
 set -e
 gcc --version
 
-BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2 -DskipTests -B -s settings.xml -Pmirror-apache-to-gpuwa"
+BUILD_ARG="-Dmaven.repo.local=$WORKSPACE/.m2 -DskipTests -B -s settings.xml -Pmirror-apache-to-urm"
 
 if [ "${CUDA_VER}"x != x ];then
    . /opt/tools/to_cudaver.sh $CUDA_VER

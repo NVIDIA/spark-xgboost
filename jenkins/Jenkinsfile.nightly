@@ -14,7 +14,7 @@ import groovy.transform.Field
 def utils
 
 def SERVERS_MAP = [
-    'Gpuwa': 'https://gpuwa.nvidia.com/artifactory/sw-spark-maven-local',
+    'Urm': 'https://urm.nvidia.com:443/artifactory/sw-spark-maven-local',
     'Local': 'http://apt-sh04:8081/repository/xgboost-spark-release'
 ]
 
@@ -31,7 +31,7 @@ pipeline {
     }
 
     parameters {
-        choice(name: 'DEPLOY_TYPE', choices: ['Gpuwa', 'Local'],
+        choice(name: 'DEPLOY_TYPE', choices: ['Urm', 'Local'],
             description: 'REPO where to deploy xgboost artifacts')
         string(name: 'REF', defaultValue: 'support-spark3.0', description: 'Commit to build')
     }
@@ -40,6 +40,7 @@ pipeline {
         LOCAL_ROOT='jenkins/local'
         BUILD_SCRIPT='$LOCAL_ROOT/build-jvm-multi.sh'
         DEPLOY_SCRIPT='$LOCAL_ROOT/deploy-jvm-multi.sh'
+        SERVER_ID='snapshots'
         SERVER_URL = "${SERVERS_MAP."$DEPLOY_TYPE"}"
         URM_CREDS = credentials("svcngcc_artifactory")
     }

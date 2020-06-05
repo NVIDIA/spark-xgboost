@@ -5,13 +5,13 @@
 */
 
 properties([parameters([
-    choice(name: 'DEPLOY_SERVER', choices: ['Local', 'Gpuwa', 'Sonatype'], description: 'The server where to deploy.'),
+    choice(name: 'DEPLOY_SERVER', choices: ['Local', 'Urm', 'Sonatype'], description: 'The server where to deploy.'),
     booleanParam(name: 'SIGN_JAR', defaultValue: true, description: 'Whether to sign files before deployment'),
 ])])
 
 def SERVERS_MAP = [
         Local: "${env.SERVER_LOCAL_URL}",
-        Gpuwa: "${env.SERVER_GPUWA_URL}",
+        Urm: "${env.SERVER_URM_URL}",
         Sonatype: "${env.SERVER_SONATYPE_URL}"
     ]
 

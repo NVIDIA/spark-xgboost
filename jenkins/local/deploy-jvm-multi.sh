@@ -13,7 +13,7 @@ SIGN_FILE=$1
 if [ "$SIGN_FILE" == true ]; then
     DEPLOY_CMD="mvn gpg:sign-and-deploy-file -s settings.xml -Dgpg.passphrase=$GPG_PASSPHRASE"
 else
-    DEPLOY_CMD="mvn deploy:deploy-file"
+    DEPLOY_CMD="mvn deploy:deploy-file -s settings.xml"
 fi
 DEPLOY_CMD="$DEPLOY_CMD -Durl=$SERVER_URL -DrepositoryId=$SERVER_ID -B \
     -B -Dmaven.repo.local=$WORKSPACE/.m2"
