@@ -52,17 +52,18 @@ node('docker-deploy') {
 
         stage ("Deploy XGBoost to ${params.DEPLOY_SERVER}") {
             withEnv ([
-                "JENKINS_UID=${sh(script: 'id -u', returnStdout: true)}",
+                "GNUPGHOME=${WORKSPACE}/.gnupg",
                 "SERVER_URL=${SERVERS_MAP[params.DEPLOY_SERVER]}",
                 'SERVER_ID=ossrh'
             ]) {
-                docker.image(IMAGE_NAME).inside("-u root") {
+                docker.image(IMAGE_NAME).inside() {
                     withCredentials([
                         file(credentialsId: "${secInfo[0]}", variable: 'GPG_FILE'),
                         string(credentialsId: "${secInfo[1]}", variable: 'GPG_PASSPHRASE'),
                         usernamePassword(credentialsId: "${secInfo[2]}",
                             passwordVariable: 'SONATYPE_PASSWORD', usernameVariable: 'SONATYPE_USERNAME')
                     ]) {
+                        sh 'rm -rf ${GNUPGHOME}'
                         sh 'gpg --import $GPG_FILE'
                         retry(3) {
                             sh "bash $DEPLOY_SCRIPT ${secInfo[3]}"

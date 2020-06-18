@@ -6,7 +6,6 @@
 ###
 set -e
 
-echo "Jenkins UID: $JENKINS_UID"
 echo "Sign Jar?: $1"
 SIGN_FILE=$1
 ###### Build deploy command ######
@@ -45,8 +44,3 @@ $DEPLOY_CMD -Dfile=./pom.xml -DpomFile=./pom.xml
 deploySubModule xgboost4j
 deploySubModule xgboost4j-spark
 
-cd -
-
-if [ "$SIGN_FILE" == true ]; then
-  chown -R $JENKINS_UID ./
-fi
