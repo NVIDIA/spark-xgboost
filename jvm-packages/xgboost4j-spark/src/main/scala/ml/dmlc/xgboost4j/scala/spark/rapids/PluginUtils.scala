@@ -26,11 +26,11 @@ object PluginUtils extends Serializable {
   // APIs for plugin related
   def isSupportColumnar(data: Dataset[_]): Boolean = {
     val pluginName = data.sparkSession.sparkContext.getConf.get("spark.sql.extensions", "")
-    pluginName == "ai.rapids.spark.SQLExecPlugin"
+    pluginName == "com.nvidia.spark.rapids.SQLExecPlugin"
   }
 
   def toColumnarRdd(df: DataFrame): RDD[Table] = {
-    Utils.classForName("ai.rapids.spark.ColumnarRdd")
+    Utils.classForName("com.nvidia.spark.rapids.ColumnarRdd")
       .getDeclaredMethod("convert", classOf[DataFrame])
       .invoke(null, df)
       .asInstanceOf[RDD[Table]]
