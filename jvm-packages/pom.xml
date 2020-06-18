@@ -37,7 +37,7 @@
         <spark.version>3.0.0-preview2</spark.version>
         <scala.version>2.12.8</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
-        <cudf.version>0.14-SNAPSHOT</cudf.version>
+        <cudf.version>0.14</cudf.version>
         <cudf.classifier>cuda10-1</cudf.classifier>
     </properties>
     <repositories>
