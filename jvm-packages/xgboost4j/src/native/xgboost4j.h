@@ -57,38 +57,6 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixCreateFro
 
 /*
  * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
- * Method:    XGDMatrixCreateFromCUDF
- * Signature: ([J[JIF)I
- */
-JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixCreateFromCUDF
-  (JNIEnv *jenv, jclass jcls, jlongArray jcols, jlongArray jout, jint gpu_id, jfloat missing);
-
-/*
- * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
- * Method:    XGDMatrixAppendCUDF
- * Signature: (J[JIF)I
- */
-JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixAppendCUDF
-  (JNIEnv *jenv, jclass jcls, jlong jhandle, jlongArray jcols, jint gpu_id, jfloat missing);
-
-/*
- * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
- * Method:    XGDMatrixSetCUDFInfo
- * Signature: (JLjava/lang/String;[JI)I
- */
-JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixSetCUDFInfo
-  (JNIEnv *jenv, jclass jcls, jlong jhandle, jstring jfield, jlongArray jcols, jint gpu_id);
-
-/*
- * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
- * Method:    XGDMatrixAppendCUDFInfo
- * Signature: (JLjava/lang/String;[JI)I
- */
-JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixAppendCUDFInfo
-  (JNIEnv *jenv, jclass jcls, jlong jhandle, jstring jfield, jlongArray jcols, jint gpu_id);
-
-/*
- * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
  * Method:    XGDMatrixSliceDMatrix
  * Signature: (J[I[J)I
  */
@@ -361,11 +329,36 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_RabitAllreduce
 
 /*
  * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
- * Method:    RabitBroadcast
- * Signature: (Ljava/nio/ByteBuffer;JI)I
+ * Method:    XGDMatrixCreateFromCUDF
+ * Signature: ([J[J[IJIF[J)I
  */
-JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_RabitBroadcast
-  (JNIEnv *, jclass, jobject, jlong, jint);
+JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixCreateFromCUDF
+    (JNIEnv *, jclass, jlongArray, jlongArray, jintArray, jlong, jint, jfloat, jlongArray);
+
+/*
+ * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
+ * Method:    XGDMatrixAppendCUDF
+ * Signature: (JIF[J[J[IJ)I
+ */
+JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixAppendCUDF
+    (JNIEnv *, jclass, jlong, jint, jfloat, jlongArray, jlongArray, jintArray, jlong);
+
+/*
+ * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
+ * Method:    XGDMatrixSetCUDFInfo
+ * Signature: (JLjava/lang/String;I[J[I[JJ)I
+ */
+JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixSetCUDFInfo
+    (JNIEnv *, jclass, jlong, jstring, jint, jlongArray, jintArray, jlongArray, jlong);
+
+/*
+ * Class:     ml_dmlc_xgboost4j_java_XGBoostJNI
+ * Method:    XGDMatrixAppendCUDFInfo
+ * Signature: (JLjava/lang/String;I[J[I[JJ)I
+ */
+JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixAppendCUDFInfo
+    (JNIEnv *, jclass, jlong, jstring, jint, jlongArray, jintArray, jlongArray, jlong);
+
 
 #ifdef __cplusplus
 }

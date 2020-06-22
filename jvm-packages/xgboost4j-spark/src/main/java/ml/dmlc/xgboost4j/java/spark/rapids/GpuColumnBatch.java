@@ -16,23 +16,57 @@
 
 package ml.dmlc.xgboost4j.java.spark.rapids;
 
+import java.util.Arrays;
 import java.util.List;
 
 import ai.rapids.cudf.ColumnVector;
 import ai.rapids.cudf.DType;
+import ai.rapids.cudf.GpuColumnVectorUtils;
 import ai.rapids.cudf.HostColumnVector;
 import ai.rapids.cudf.Table;
 
 import org.apache.spark.sql.types.*;
+import org.apache.spark.util.random.BernoulliCellSampler;
+
+import ml.dmlc.xgboost4j.java.rapids.ColumnData;
+import ml.dmlc.xgboost4j.scala.spark.rapids.GpuSampler;
 
 public class GpuColumnBatch {
   private Table table;
   private final StructType schema;
-  private GpuSampler sampler;
+  private final GpuSampler sampler;
 
   public GpuColumnBatch(Table table, StructType schema) {
     this.table = table;
     this.schema = schema;
+    this.sampler = null;
+  }
+
+  public GpuColumnBatch(Table table, StructType schema, GpuSampler sampler) {
+    this.table = table;
+    this.schema = schema;
+    this.sampler = sampler;
+
+    samplingTable();
+  }
+
+  private void samplingTable() {
+    if (sampler != null) {
+      BernoulliCellSampler bcs = new BernoulliCellSampler(sampler.lb(), sampler.ub(),
+          sampler.complement());
+      bcs.setSeed(sampler.seed());
+      Long num_rows = getNumRows();
+      byte[] maskVals = new byte[num_rows.intValue()];
+      for (int i = 0; i < num_rows.intValue(); i++) {
+        maskVals[i] = (byte) bcs.sample();
+      }
+      ColumnVector mask = ColumnVector.boolFromBytes(maskVals);
+      Table filteredTable = table.filter(mask);
+      mask.close();
+      table.close();
+      table = null;
+      table = filteredTable;
+    }
   }
 
   public StructType getSchema() {
@@ -208,5 +242,21 @@ public class GpuColumnBatch {
       return DType.STRING; // TODO what do we want to do about STRING_CATEGORY???
     }
     return null;
+  }
+
+  public ColumnData[] getAsColumnData(int... indices) {
+    if (indices == null || indices.length == 0) return new ColumnData[]{};
+    return Arrays.stream(indices)
+      .mapToObj(indice -> getColumnVector((int) indice))
+      .map(GpuColumnVectorUtils::getColumnData)
+      .toArray(ColumnData[]::new);
+  }
+
+  public ColumnData[] getAsColumnData(long... indices) {
+    if (indices == null || indices.length == 0) return new ColumnData[]{};
+    return Arrays.stream(indices)
+      .mapToObj(indice -> getColumnVector((int) indice))
+      .map(GpuColumnVectorUtils::getColumnData)
+      .toArray(ColumnData[]::new);
   }
 }

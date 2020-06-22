@@ -20,18 +20,14 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <memory>
+#include <iostream>
+#include <xgboost/gpu_column.h>
 
 #include <cuda_runtime.h>
-#include <cudf/cudf.h>
-#include <cudf/column/column_view.hpp>
-#include <rmm/rmm.h>
 
 #include "xgboost4j_spark_gpu.h"
 #include "xgboost4j_spark.h"
-
-using cudf::column_view;
-using cudf::type_id;
-using cudf::bitmask_type;
 
 namespace xgboost {
 namespace spark {
@@ -49,15 +45,15 @@ public:
   }
 
   unique_gpu_ptr(size_t size) : ptr(nullptr) {
-    rmmError_t rmm_status = RMM_ALLOC(&ptr, size, 0);
-    if (rmm_status != RMM_SUCCESS) {
+    cudaError_t status = cudaMalloc(&ptr, size);
+    if (status != cudaSuccess) {
       throw std::bad_alloc();
     }
   }
 
   ~unique_gpu_ptr() {
     if (ptr != nullptr) {
-      RMM_FREE(ptr, 0);
+      cudaFree(ptr);
     }
   }
 
@@ -84,20 +80,15 @@ static unsigned int get_unsaferow_nullset_size(unsigned int num_columns) {
   return ((num_columns + 63) / 64) * 8;
 }
 
-/*! \brief Returns the byte width of the specified data type. */
-static size_t get_dtype_size(type_id dtype) {
-  return cudf::size_of(cudf::data_type(dtype));
-}
-
 static void build_unsafe_row_nullsets(void* unsafe_rows_dptr,
-    std::vector<column_view const*> const& gdfcols) {
+    std::vector<gpu_column_data *> const& gdfcols) {
   unsigned int num_columns = gdfcols.size();
-  size_t num_rows = gdfcols[0]->size();
+  size_t num_rows = gdfcols[0]->num_row;
 
   // make the array of validity data pointers available on the device
   std::vector<uint32_t const*> valid_ptrs(num_columns);
   for (int i = 0; i < num_columns; ++i) {
-    valid_ptrs[i] = gdfcols[i]->null_mask();
+    valid_ptrs[i] = reinterpret_cast<const unsigned int *>(gdfcols[i]->valid_ptr);
   }
   unique_gpu_ptr dev_valid_mem(num_columns * sizeof(*valid_ptrs.data()));
   uint32_t** dev_valid_ptrs = reinterpret_cast<uint32_t**>(dev_valid_mem.get());
@@ -126,10 +117,10 @@ static void build_unsafe_row_nullsets(void* unsafe_rows_dptr,
  * where the null bitset is a collection of 64-bit words with each bit
  * indicating whether the corresponding field is null.
  */
-void* build_unsafe_rows(std::vector<column_view const*> const& gdfcols) {
+void* build_unsafe_rows(std::vector<gpu_column_data *> const& gdfcols) {
   cudaError_t cuda_status;
   unsigned int num_columns = gdfcols.size();
-  size_t num_rows = gdfcols[0]->size();
+  size_t num_rows = gdfcols[0]->num_row;
   unsigned int nullset_size = get_unsaferow_nullset_size(num_columns);
   unsigned int row_size = nullset_size + num_columns * 8;
   size_t unsafe_rows_size = num_rows * row_size;
@@ -142,13 +133,12 @@ void* build_unsafe_rows(std::vector<column_view const*> const& gdfcols) {
   for (int i = 0; i < num_columns; ++i) {
     // point to the corresponding field in the first UnsafeRow
     uint8_t* dest_addr = unsafe_rows_dptr + nullset_size + i * 8;
-    unsigned int dtype_size = get_dtype_size(gdfcols[i]->type().id());
-    if (dtype_size == 0) {
+    int dtype_size = gdfcols[i]->dtype_size_in_bytes;
+    if (dtype_size <= 0) {
       throw std::runtime_error("Unsupported column type");
     }
-
     cuda_status = xgboost::spark::store_with_stride_async(dest_addr,
-        gdfcols[i]->head(), num_rows, dtype_size, row_size, 0);
+        gdfcols[i]->data_ptr, num_rows, dtype_size, row_size, 0);
     if (cuda_status != cudaSuccess) {
       throw std::runtime_error(cudaGetErrorString(cuda_status));
     }
@@ -163,7 +153,7 @@ void* build_unsafe_rows(std::vector<column_view const*> const& gdfcols) {
   }
   // This copy also serves as a synchronization point with the GPU.
   cuda_status = cudaMemcpy(unsafe_rows.get(), unsafe_rows_dptr,
-      unsafe_rows_size, cudaMemcpyDeviceToHost);
+                           unsafe_rows_size, cudaMemcpyDeviceToHost);
   if (cuda_status != cudaSuccess) {
     throw std::runtime_error(cudaGetErrorString(cuda_status));
   }
@@ -189,8 +179,10 @@ static void throw_java_exception(JNIEnv* env, char const* msg) {
 
 JNIEXPORT jlong JNICALL
 Java_ml_dmlc_xgboost4j_java_XGBoostSparkJNI_buildUnsafeRows(JNIEnv * env,
-    jclass clazz, jlongArray nativeColumnPtrs) {
-  int num_columns = env->GetArrayLength(nativeColumnPtrs);
+    jclass clazz, jlongArray dataPtrs, jlongArray validPtrs, jintArray dTypePtrs, jlong numRows) {
+  // FIXME, Do we need to check if the size of dataPtrs/validPtrs/dTypePtrs should be same
+  int num_columns = env->GetArrayLength(dataPtrs);
+
   if (env->ExceptionOccurred()) {
     return 0;
   }
@@ -199,25 +191,53 @@ Java_ml_dmlc_xgboost4j_java_XGBoostSparkJNI_buildUnsafeRows(JNIEnv * env,
     return 0;
   }
 
-  std::vector<column_view const*> gdfcols(num_columns);
-  jlong* column_jlongs = env->GetLongArrayElements(nativeColumnPtrs, nullptr);
-  if (column_jlongs == nullptr) {
+  std::vector<gpu_column_data *> gpu_cols;
+
+  jlong* data_jlongs = env->GetLongArrayElements(dataPtrs, nullptr);
+  if (data_jlongs == nullptr) {
+    throw_java_exception(env, "Failed to get data handles");
+    return 0;
+  }
+  jlong* valid_jlongs = env->GetLongArrayElements(validPtrs, nullptr);
+  if (valid_jlongs == nullptr) {
+    env->ReleaseLongArrayElements(dataPtrs, data_jlongs, JNI_ABORT);
+    throw_java_exception(env, "Failed to get valid handles");
+    return 0;
+  }
+  jint* dtype_jints = env->GetIntArrayElements(dTypePtrs, nullptr);
+  if (dtype_jints == nullptr) {
+    env->ReleaseLongArrayElements(dataPtrs, data_jlongs, JNI_ABORT);
+    env->ReleaseLongArrayElements(validPtrs, valid_jlongs, JNI_ABORT);
+    throw_java_exception(env, "Failed to get data type sizes");
     return 0;
   }
   for (int i = 0; i < num_columns; ++i) {
-    gdfcols[i] = reinterpret_cast<column_view*>(column_jlongs[i]);
+    gpu_column_data* tmp_column = new gpu_column_data;
+    tmp_column->data_ptr = reinterpret_cast<long * > (data_jlongs[i]);
+    tmp_column->valid_ptr = reinterpret_cast<long * > (valid_jlongs[i]);
+    tmp_column->dtype_size_in_bytes = dtype_jints[i];
+    tmp_column->num_row = numRows;
+    tmp_column->type_id = 0; // not used for building unsafe row
+    gpu_cols.push_back(tmp_column);
   }
-  env->ReleaseLongArrayElements(nativeColumnPtrs, column_jlongs, JNI_ABORT);
+
+  env->ReleaseLongArrayElements(dataPtrs, data_jlongs, JNI_ABORT);
+  env->ReleaseLongArrayElements(validPtrs, valid_jlongs, JNI_ABORT);
+  env->ReleaseIntArrayElements(dTypePtrs, dtype_jints, JNI_ABORT);
 
   void* unsafe_rows = nullptr;
   try {
-    unsafe_rows = xgboost::spark::build_unsafe_rows(gdfcols);
+    unsafe_rows = xgboost::spark::build_unsafe_rows(gpu_cols);
   } catch (std::bad_alloc const& e) {
     throw_java_exception(env, "java/lang/OutOfMemoryError",
-        "Could not allocate native memory");
+                         "Could not allocate native memory");
   } catch (std::exception const& e) {
     throw_java_exception(env, e.what());
   }
+  for (int i = 0; i < num_columns; i++) {
+    delete (gpu_cols[i]);
+  }
+  gpu_cols.clear();
 
   return reinterpret_cast<jlong>(unsafe_rows);
 }

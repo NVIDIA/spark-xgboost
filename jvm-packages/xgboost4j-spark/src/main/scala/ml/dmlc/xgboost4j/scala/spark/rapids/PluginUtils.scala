@@ -17,25 +17,24 @@
 package ml.dmlc.xgboost4j.scala.spark.rapids
 
 import ai.rapids.cudf.Table
+import ml.dmlc.xgboost4j.scala.spark.params.Utils
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Dataset}
 
 object PluginUtils extends Serializable {
-  // scalastyle:off classforname
-  def isSupportColumnar: Boolean = try {
-    Class.forName("ai.rapids.spark.ColumnarRdd")
-    true
-  } catch {
-    case _: ClassNotFoundException => false
+
+  // APIs for plugin related
+  def isSupportColumnar(data: Dataset[_]): Boolean = {
+    val pluginName = data.sparkSession.sparkContext.getConf.get("spark.sql.extensions", "")
+    pluginName == "com.nvidia.spark.rapids.SQLExecPlugin"
   }
 
   def toColumnarRdd(df: DataFrame): RDD[Table] = {
-    Class.forName("ai.rapids.spark.ColumnarRdd")
+    Utils.classForName("com.nvidia.spark.rapids.ColumnarRdd")
       .getDeclaredMethod("convert", classOf[DataFrame])
       .invoke(null, df)
       .asInstanceOf[RDD[Table]]
   }
-  // scalastyle:on classforname
 
   // calculate bench mark
   def time[R](phase: String)(block: => R): (R, Float) = {

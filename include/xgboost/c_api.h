@@ -12,8 +12,9 @@
 #include <cstdio>
 #include <cstdint>
 #ifdef XGBOOST_USE_CUDF
-#include <cudf/types.hpp>
-using cudf::column_view;
+#include <xgboost/gpu_column.h>
+#include <iostream>
+#include <vector>
 #endif
 #else
 #define XGB_EXTERN_C
@@ -110,20 +111,20 @@ XGB_DLL int XGBRegisterLogCallback(void (*callback)(const char*));
 #ifdef XGBOOST_USE_CUDF
 /*!
  * \brief create a data matrix from a CUDA data frame (CUDF)
- * \param cols array of CUDF columns
- * \param n_cols number of CUDF columns
+ * \param cols array of gpu_column_data columns
  * \param[out] out handle for the DMatrix built
  * \param gpu_id the gpu id to use
  * \param missing missing value
  * \return 0 when success, -1 when failure happens
  */
-XGB_DLL int XGDMatrixCreateFromCUDF
-(column_view **cols, size_t n_cols, DMatrixHandle *out, int gpu_id, float missing);
+XGB_DLL int XGDMatrixCreateFromCUDF(std::vector<gpu_column_data *> const& cols,
+                                    DMatrixHandle *out,
+                                    int gpu_id,
+                                    float missing);
 
 /*!
  * \brief Appends to a data matrix the CUDA data frame (CUDF)
  * \param[in] cols array of CUDF columns
- * \param[in] n_cols number of CUDF columns
  * \param[in] handle to a previously built DMatrix (returned by XGDMatrixCreateFromCUDF)
  * \param[in] gpu_id the gpu id to use
  * \param[in] missing missing value
@@ -134,8 +135,8 @@ XGB_DLL int XGDMatrixCreateFromCUDF
  *       to the dmatrix returned by the XGDMatrixCreateFromCUDF API.
  * \return 0 when success, -1 when failure happens
  */
-XGB_DLL int XGDMatrixAppendCUDF
-(column_view **cols, size_t n_cols, DMatrixHandle handle, int gpu_idi, float missing);
+XGB_DLL int XGDMatrixAppendCUDF(std::vector<gpu_column_data *> const& cols, DMatrixHandle handle,
+    int gpu_id, float missing);
 #endif
 
 /*!
@@ -309,8 +310,7 @@ XGB_DLL int XGDMatrixSetFloatInfo(DMatrixHandle handle,
  */
 XGB_DLL int XGDMatrixSetCUDFInfo(DMatrixHandle handle,
                                  const char *field,
-                                 column_view** gdf,
-                                 size_t n_cols,
+                                 std::vector<gpu_column_data *> const& cols,
                                  int gpu_id);
 
 /*!
@@ -326,8 +326,7 @@ XGB_DLL int XGDMatrixSetCUDFInfo(DMatrixHandle handle,
  */
 XGB_DLL int XGDMatrixAppendCUDFInfo(DMatrixHandle handle,
                                     const char *field,
-                                    column_view** gdf,
-                                    size_t n_cols,
+                                    std::vector<gpu_column_data *> const& cols,
                                     int gpu_id);
 #endif
 

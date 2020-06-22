@@ -18,7 +18,6 @@ package ml.dmlc.xgboost4j.java;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -30,8 +29,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 public class EnvironmentDetector {
-
-  private static String cudaVersionFile = "/usr/local/cuda/version.txt";
 
   private static final Log log = LogFactory.getLog(EnvironmentDetector.class);
 
@@ -58,9 +55,11 @@ public class EnvironmentDetector {
     // thirdly, try reading version from CUDA home
     if (!version.isPresent()) {
       try {
-        version = extractPattern(readFileContent(cudaVersionFile), "CUDA Version ([.0-9]+)");
+        version = extractPattern(
+            readFileContent("/usr/local/cuda/version.txt"),
+            "CUDA Version ([.0-9]+)");
         version.ifPresent(literal -> {
-          log.info(String.format("Found CUDA version from %s: %s", cudaVersionFile, literal));
+          log.info("Found CUDA version from /usr/local/cuda/version.txt: " + literal);
         });
       } catch (IOException e) {
         log.debug("Could not read CUDA version from CUDA home", e);
@@ -77,13 +76,13 @@ public class EnvironmentDetector {
   }
 
   private static String readFileContent(String path) throws IOException {
-    return new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
+    return new String(Files.readAllBytes(Paths.get(path)));
   }
 
   private static String runCommand(String ...command) throws IOException, InterruptedException {
     Process process = Runtime.getRuntime().exec(command);
-    try (BufferedReader reader = new BufferedReader(
-        new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+    try (BufferedReader reader =
+        new BufferedReader(new InputStreamReader(process.getInputStream()))) {
       return reader.lines().collect(Collectors.joining(System.lineSeparator()));
     } finally {
       assert process.waitFor() == 0;

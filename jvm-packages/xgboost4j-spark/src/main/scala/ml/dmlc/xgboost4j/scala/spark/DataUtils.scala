@@ -16,10 +16,10 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
-import ai.rapids.cudf.Table
+import ai.rapids.cudf.{GpuColumnVectorUtils, Table}
 import ml.dmlc.xgboost4j.java.spark.rapids.GpuColumnBatch
 import ml.dmlc.xgboost4j.scala.DMatrix
-import ml.dmlc.xgboost4j.scala.spark.rapids.{ColumnBatchToRow, PluginUtils}
+import ml.dmlc.xgboost4j.scala.spark.rapids.{ColumnBatchToRow, GpuSampler, PluginUtils}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import org.apache.spark.TaskContext
 import org.apache.spark.ml.feature.{LabeledPoint => MLLabeledPoint}
@@ -109,26 +109,24 @@ object DataUtils extends Serializable {
   }
 
   private[spark] def buildDMatrixIncrementally(gpuId: Int, missing: Float,
-      featureIndices: Seq[Int], iter: Iterator[Table],
-      schema: StructType): (DMatrix, ColumnBatchToRow) = {
+      featureIndices: Seq[Int], iter: Iterator[Table], schema: StructType,
+      sampler: Option[GpuSampler] = None, colNameToBuild: Option[String] = None):
+        (DMatrix, ColumnBatchToRow) = {
 
     var dm: DMatrix = null
     var isFirstBatch = true
     val columnBatchToRow: ColumnBatchToRow = new ColumnBatchToRow
 
     while (iter.hasNext) {
-      val table = iter.next()
-      val columnBatch = new GpuColumnBatch(table, schema)
-      val features_ = Array(featureIndices.map(columnBatch.getColumn): _*)
+      val columnBatch = new GpuColumnBatch(iter.next(), schema, sampler.getOrElse(null))
       if (isFirstBatch) {
         isFirstBatch = false
-        dm = new DMatrix(features_, gpuId, missing)
+        dm = new DMatrix(gpuId, missing, columnBatch.getAsColumnData(featureIndices: _*): _*)
       } else {
-        dm.appendCUDF(features_)
+        dm.appendCUDF(columnBatch.getAsColumnData(featureIndices: _*): _*)
       }
-
-      columnBatchToRow.appendColumnBatch(columnBatch)
-      table.close()
+      columnBatchToRow.appendColumnBatch(columnBatch, colNameToBuild)
+      columnBatch.close()
     }
     if (dm == null) {
       // here we allow empty iter
@@ -170,21 +168,4 @@ object DataUtils extends Serializable {
     GDFColumnData(dataFrame, indices, opGroup)
   }
 
-  // This method is running on executor side
-  private[spark] def getGpuId(isLocal: Boolean): Int = {
-    // Call allocateGpuDevice to force assignment of GPU when in exclusive process mode
-    // and pass that as the gpu_id, assumption is that if you are using CUDA_VISIBLE_DEVICES
-    // it doesn't hurt to call allocateGpuDevice so just always do it.
-    var gpuId = 0
-    val context = TaskContext.get()
-    if (!isLocal) {
-      val resources = context.resources()
-      val assignedGpuAddrs = resources.get("gpu").getOrElse(
-        throw new RuntimeException("Spark could not allocate gpus for executor"))
-      gpuId = if (assignedGpuAddrs.addresses.length < 1) {
-        throw new RuntimeException("executor could not get specific address of gpu")
-      } else assignedGpuAddrs.addresses(0).toInt
-    }
-    gpuId
-  }
 }

@@ -23,7 +23,7 @@ import scala.collection.JavaConverters._
 import ml.dmlc.xgboost4j.java.{Rabit, XGBoostSparkJNI}
 import ml.dmlc.xgboost4j.{LabeledPoint => XGBLabeledPoint}
 import ml.dmlc.xgboost4j.scala.spark.params.{DefaultXGBoostParamsReader, _}
-import ml.dmlc.xgboost4j.scala.spark.rapids.{PluginUtils, RowConverter}
+import ml.dmlc.xgboost4j.scala.spark.rapids.{GpuDeviceManager, GpuSampler, PluginUtils, RowConverter}
 import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, XGBoost => SXGBoost}
 import ml.dmlc.xgboost4j.scala.{EvalTrait, ObjectiveTrait}
 import org.apache.commons.logging.LogFactory
@@ -161,8 +161,11 @@ class XGBoostRegressor (
       "rmse"
     }
   }
-
-  override protected def train(dataset: Dataset[_]): XGBoostRegressionModel = {
+  private[spark] def trainWithGpuSampler(dataset: Dataset[_], sampler: Option[GpuSampler]):
+    XGBoostRegressionModel = {
+    if (sampler.isEmpty) {
+      new IllegalArgumentException("sampler should not be None")
+    }
 
     if (!isDefined(evalMetric) || $(evalMetric).isEmpty) {
       set(evalMetric, setupDefaultEvalMetric())
@@ -172,41 +175,74 @@ class XGBoostRegressor (
       set(objectiveType, "regression")
     }
 
-    val (_booster, _metrics) = if (PluginUtils.isSupportColumnar) {
-      // Spark plugin for GPU is loaded, go into GPU pipeline
-      trainHonorGpu(dataset.asInstanceOf[DataFrame])
-    } else {
-      // Others fallback to CPU pipeline
+    // Spark plugin for GPU is loaded, go into GPU pipeline
+    val (_booster, _metrics) = trainHonorGpu(dataset.asInstanceOf[DataFrame], sampler)
 
-      val weight = if (!isDefined(weightCol) || $(weightCol).isEmpty) lit(1.0)
-                   else col($(weightCol))
-      val baseMargin = if (!isDefined(baseMarginCol) || $(baseMarginCol).isEmpty) {
-        lit(Float.NaN)
-      } else {
-        col($(baseMarginCol))
-      }
-      val group = if (!isDefined(groupCol) || $(groupCol).isEmpty) lit(-1) else col($(groupCol))
-      val trainingSet: RDD[XGBLabeledPoint] = DataUtils.convertDataFrameToXGBLabeledPointRDDs(
-        col($(labelCol)), col($(featuresCol)), weight, baseMargin, Some(group),
-        dataset.asInstanceOf[DataFrame]).head
-      val evalRDDMap = getEvalSets(xgboostParams).map {
-        case (name, dataFrame) => (name,
-          DataUtils.convertDataFrameToXGBLabeledPointRDDs(col($(labelCol)), col($(featuresCol)),
-            weight, baseMargin, Some(group), dataFrame).head)
-      }
-      transformSchema(dataset.schema, logging = true)
-      val derivedXGBParamMap = MLlib2XGBoostParams
-      // All non-null param maps in XGBoostRegressor are in derivedXGBParamMap.
-      XGBoost.trainDistributed(trainingSet, derivedXGBParamMap,
-        hasGroup = group != lit(-1), evalRDDMap)
+    val model = new XGBoostRegressionModel(uid, _booster)
+    val summary = XGBoostTrainingSummary(_metrics)
+    model.setSummary(summary)
+    copyValues(model).setParent(this)
+  }
+
+  private def trainGpu(dataset: Dataset[_]): XGBoostRegressionModel = {
+    if (!isDefined(evalMetric) || $(evalMetric).isEmpty) {
+      set(evalMetric, setupDefaultEvalMetric())
     }
+
+    if (isDefined(customObj) && $(customObj) != null) {
+      set(objectiveType, "regression")
+    }
+
+    val (_booster, _metrics) = trainHonorGpu(dataset.asInstanceOf[DataFrame])
+    val model = new XGBoostRegressionModel(uid, _booster)
+    val summary = XGBoostTrainingSummary(_metrics)
+    model.setSummary(summary)
+    copyValues(model).setParent(this)
+  }
+
+  override def fit(dataset: Dataset[_]): XGBoostRegressionModel = {
+    if (PluginUtils.isSupportColumnar(dataset)) trainGpu(dataset) else super.fit(dataset)
+  }
+
+  override protected def train(dataset: Dataset[_]): XGBoostRegressionModel = {
+    if (!isDefined(evalMetric) || $(evalMetric).isEmpty) {
+      set(evalMetric, setupDefaultEvalMetric())
+    }
+
+    if (isDefined(customObj) && $(customObj) != null) {
+      set(objectiveType, "regression")
+    }
+
+    val weight = if (!isDefined(weightCol) || $(weightCol).isEmpty) lit(1.0)
+    else col($(weightCol))
+    val baseMargin = if (!isDefined(baseMarginCol) || $(baseMarginCol).isEmpty) {
+      lit(Float.NaN)
+    } else {
+      col($(baseMarginCol))
+    }
+    val group = if (!isDefined(groupCol) || $(groupCol).isEmpty) lit(-1) else col($(groupCol))
+    val trainingSet: RDD[XGBLabeledPoint] = DataUtils.convertDataFrameToXGBLabeledPointRDDs(
+      col($(labelCol)), col($(featuresCol)), weight, baseMargin, Some(group),
+      dataset.asInstanceOf[DataFrame]).head
+    val evalRDDMap = getEvalSets(xgboostParams).map {
+      case (name, dataFrame) => (name,
+        DataUtils.convertDataFrameToXGBLabeledPointRDDs(col($(labelCol)), col($(featuresCol)),
+          weight, baseMargin, Some(group), dataFrame).head)
+    }
+    transformSchema(dataset.schema, logging = true)
+    val derivedXGBParamMap = MLlib2XGBoostParams
+    // All non-null param maps in XGBoostRegressor are in derivedXGBParamMap.
+    val (_booster, _metrics) = XGBoost.trainDistributed(trainingSet, derivedXGBParamMap,
+      hasGroup = group != lit(-1), evalRDDMap)
+
     val model = new XGBoostRegressionModel(uid, _booster)
     val summary = XGBoostTrainingSummary(_metrics)
     model.setSummary(summary)
     model
   }
 
-  private def trainHonorGpu(columnarDF: DataFrame): (Booster, Map[String, Array[Float]]) = {
+  private def trainHonorGpu(columnarDF: DataFrame, sampler: Option[GpuSampler] = None):
+      (Booster, Map[String, Array[Float]]) = {
     // Check columns and build column data
     val weightColName = if (isDefined(weightCol)) $(weightCol) else null
     val groupColName = if (isDefined(groupCol)) $(groupCol) else null
@@ -218,19 +254,7 @@ class XGBoostRegressor (
         weightColName, groupColName, df))
     }
     val derivedXGBParamMap = MLlib2XGBoostParams
-    XGBoost.trainDistributedPreferGpu(columnData, derivedXGBParamMap, evalRDDMap, false)
-  }
-
-  protected override def validateAndTransformSchema(
-      schema: StructType,
-      fitting: Boolean,
-      featuresDataType: DataType): StructType = {
-    if (PluginUtils.isSupportColumnar) {
-      // Bypass the column check for GPU pipeline
-      schema
-    } else {
-      super.validateAndTransformSchema(schema, fitting, featuresDataType)
-    }
+    XGBoost.trainDistributedPreferGpu(columnData, derivedXGBParamMap, evalRDDMap, false, sampler)
   }
 
   override def copy(extra: ParamMap): XGBoostRegressor = defaultCopy(extra)
@@ -305,7 +329,8 @@ class XGBoostRegressionModel private[ml] (
     0.0f
   }
 
-  private def transformInternalHonorGpu(dataFrame: DataFrame): DataFrame = {
+  private def transformInternalHonorGpu(dataFrame: DataFrame, sampler: Option[GpuSampler] = None,
+      colNameToBuild: Option[String] = None): DataFrame = {
     val originalSchema = dataFrame.schema
 
     // dataReadSchema filters out some fields that RowConverter is not supporting
@@ -332,11 +357,12 @@ class XGBoostRegressionModel private[ml] (
     val isLocal = sc.isLocal
 
     val resultRDD = PluginUtils.toColumnarRdd(dataFrame).mapPartitions((iter: Iterator[Table]) => {
-      val gpuId = DataUtils.getGpuId(isLocal)
+      val gpuId = GpuDeviceManager.getGpuId(isLocal)
       logger.info("XGboost regressor transform GPU pipeline using device: " + gpuId)
 
       val ((dm, columnBatchToRow), time) = PluginUtils.time("Transform: build dmatrix and row") {
-        DataUtils.buildDMatrixIncrementally(gpuId, missing, featureIndices, iter, originalSchema)
+        DataUtils.buildDMatrixIncrementally(gpuId, missing, featureIndices, iter, originalSchema,
+          sampler, colNameToBuild)
       }
       logger.debug("Benchmark [Transform: Build Dmatrix and Row] " + time)
 
@@ -493,9 +519,36 @@ class XGBoostRegressionModel private[ml] (
     }
     Array(originalPredictionItr, predLeafItr, predContribItr)
   }
+  private[spark] def transformWithGpuSampler(dataset: Dataset[_],
+      sampler: Option[GpuSampler], colNameToBuild: Option[String] = None): DataFrame = {
+    if (sampler.isEmpty) {
+      new IllegalArgumentException("sampler should not be None")
+    }
+    // Output selected columns only.
+    // This is a bit complicated since it tries to avoid repeated computation.
+    var outputData = transformInternalHonorGpu(dataset.asInstanceOf[DataFrame])
+    var numColsOutput = 0
+
+    val predictUDF = udf { (originalPrediction: mutable.WrappedArray[Float]) =>
+      originalPrediction(0).toDouble
+    }
+
+    if ($(predictionCol).nonEmpty) {
+      outputData = outputData
+        .withColumn($(predictionCol), predictUDF(col(_originalPredictionCol)))
+      numColsOutput += 1
+    }
+
+    if (numColsOutput == 0) {
+      this.logWarning(s"$uid: ProbabilisticClassificationModel.transform() was called as NOOP" +
+        " since no output columns were set.")
+    }
+    outputData.toDF.drop(col(_originalPredictionCol))
+
+  }
 
   override def transform(dataset: Dataset[_]): DataFrame = {
-    val isSupportColumnar = PluginUtils.isSupportColumnar
+    val isSupportColumnar = PluginUtils.isSupportColumnar(dataset)
     if (!isSupportColumnar) {
       transformSchema(dataset.schema, logging = true)
     }
@@ -523,6 +576,7 @@ class XGBoostRegressionModel private[ml] (
         " since no output columns were set.")
     }
     outputData.toDF.drop(col(_originalPredictionCol))
+
   }
 
   override def copy(extra: ParamMap): XGBoostRegressionModel = {

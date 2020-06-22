@@ -18,6 +18,7 @@ package ml.dmlc.xgboost4j.java;
 import java.util.Iterator;
 
 import ml.dmlc.xgboost4j.LabeledPoint;
+import ml.dmlc.xgboost4j.java.rapids.ColumnData;
 
 /**
  * DMatrix for xgboost.
@@ -26,7 +27,7 @@ import ml.dmlc.xgboost4j.LabeledPoint;
  */
 public class DMatrix {
   protected long handle = 0;
-  private int gpu_id = 0;
+  private int gpuId = 0;
   private float missing = Float.NaN;
 
   /**
@@ -156,62 +157,63 @@ public class DMatrix {
   /**
    * Create DMatrix from cuDF.
    *
-   * @param gdf_cols The native handles of GDF columns
+   * @param cds ColumnData
    * @throws XGBoostError native error
    */
-  public DMatrix(long[] gdf_cols) throws XGBoostError  {
-    this(gdf_cols, 0, Float.NaN);
+  public DMatrix(final ColumnData... cds) throws XGBoostError  {
+    this(0, Float.NaN, cds);
   }
 
   /**
    * Create DMatrix from cuDF.
    *
-   * @param gdf_cols The native handles of GDF columns
-   * @param gpu_id   The gpu id to use
+   * @param gpuId   The gpu id to use
+   * @param missing  missing value
+   * @param cds      ColumnData
    * @throws XGBoostError native error
    */
-  public DMatrix(long[] gdf_cols, int gpu_id, float missing) throws XGBoostError {
-    if (gdf_cols == null) {
-      throw new NullPointerException("gdf_cols: null");
+  public DMatrix(int gpuId, float missing, final ColumnData... cds) throws XGBoostError {
+    if (cds == null || cds.length <= 0) {
+      throw new NullPointerException("ColumnDatas: empty");
     }
     long[] out = new long[1];
-    this.gpu_id = gpu_id;
+    this.gpuId = gpuId;
     this.missing = missing;
-    XGBoostJNI.checkCall(XGBoostJNI.XGDMatrixCreateFromCUDF(gdf_cols, out, gpu_id, missing));
+    XGBoostJNI.checkCall(XGBoostJNI.XGDMatrixCreateFromCUDF(gpuId, missing, out, cds));
     handle = out[0];
   }
 
   /**
    * Append CUDF to DMatrix
-   * @param gdf_cols
+   * @param cds ColumnDatas
    * @throws XGBoostError
    */
-  public void appendCUDF(long[] gdf_cols) throws XGBoostError {
-    if (gdf_cols == null) {
-      throw new NullPointerException("gdf_cols: null");
+  public void appendCUDF(final ColumnData... cds) throws XGBoostError {
+    if (cds == null || cds.length <= 0) {
+      throw new NullPointerException("ColumnDatas: empty");
     }
-    XGBoostJNI.checkCall(XGBoostJNI.XGDMatrixAppendCUDF(handle, gdf_cols, gpu_id, missing));
+    XGBoostJNI.checkCall(XGBoostJNI.XGDMatrixAppendCUDF(handle, gpuId, missing, cds));
   }
 
   /**
    * Set CUDF information for DMatrix.
    *
    * @param field  The name of this info, such as "label" or "weight"
-   * @param cols   The native handles of GDF columns
+   * @param cds   ColumnDatas
    * @throws XGBoostError native error
    */
-  public void setCUDFInfo(String field, long[] cols) throws XGBoostError {
-    XGBoostJNI.checkCall(XGBoostJNI.XGDMatrixSetCUDFInfo(handle, field, cols, gpu_id));
+  public void setCUDFInfo(String field, final ColumnData... cds) throws XGBoostError {
+    XGBoostJNI.checkCall(XGBoostJNI.XGDMatrixSetCUDFInfo(handle, field, gpuId, cds));
   }
 
   /**
    * Append CUDF information for DMatrix
    * @param field
-   * @param cols
+   * @param cds
    * @throws XGBoostError
    */
-  public void appendCUDFInfo(String field, long[] cols) throws XGBoostError {
-    XGBoostJNI.checkCall(XGBoostJNI.XGDMatrixAppendCUDFInfo(handle, field, cols, gpu_id));
+  public void appendCUDFInfo(String field, final ColumnData... cds) throws XGBoostError {
+    XGBoostJNI.checkCall(XGBoostJNI.XGDMatrixAppendCUDFInfo(handle, field, gpuId, cds));
   }
 
   // END CUDF Support

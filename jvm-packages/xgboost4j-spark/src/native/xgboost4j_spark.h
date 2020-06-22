@@ -10,10 +10,10 @@ extern "C" {
 /*
  * Class:     ml_dmlc_xgboost4j_java_XGBoostSparkJNI
  * Method:    buildUnsafeRows
- * Signature: ([J)J
+ * Signature: ([J[J[IJ)J
  */
 JNIEXPORT jlong JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostSparkJNI_buildUnsafeRows
-  (JNIEnv *, jclass, jlongArray);
+    (JNIEnv *, jclass, jlongArray, jlongArray, jintArray, jlong);
 
 /*
  * Class:     ml_dmlc_xgboost4j_java_XGBoostSparkJNI

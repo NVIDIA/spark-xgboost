@@ -647,7 +647,7 @@ __global__ void SharedMemHistKernel(ELLPackMatrix matrix,
       // global memory
       GradientSumT* atomic_add_ptr =
           use_shared_memory_histograms ? smem_arr : d_node_hist;
-      dh::AtomicAddGpair(atomic_add_ptr + gidx, d_gpair[ridx]);
+      AtomicAddGpair(atomic_add_ptr + gidx, d_gpair[ridx]);
     }
   }
 
@@ -656,7 +656,7 @@ __global__ void SharedMemHistKernel(ELLPackMatrix matrix,
     __syncthreads();
     for (auto i :
          dh::BlockStrideRange(static_cast<size_t>(0), matrix.BinCount())) {
-      dh::AtomicAddGpair(d_node_hist + i, smem_arr[i]);
+      AtomicAddGpair(d_node_hist + i, smem_arr[i]);
     }
   }
 }

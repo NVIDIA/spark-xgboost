@@ -65,28 +65,26 @@
               </configuration>
           </plugin>
           <plugin>
-              <groupId>org.codehaus.mojo</groupId>
               <artifactId>exec-maven-plugin</artifactId>
+              <groupId>org.codehaus.mojo</groupId>
               <version>1.6.0</version>
               <executions>
                   <execution>
-                      <id>extract-libcudf</id>
-                      <phase>generate-sources</phase>
+                      <id>version-check</id>
+                      <phase>validate</phase>
                       <goals>
                           <goal>exec</goal>
                       </goals>
                   </execution>
               </executions>
               <configuration>
-                  <executable>bash</executable>
-                  <workingDirectory>${user.dir}</workingDirectory>
+                  <executable>python</executable>
                   <arguments>
-                      <argument>prepare_extra_libs.sh</argument>
-                      <argument>${settings.localRepository}</argument>
-                      <argument>${user.dir}/../build/extra-libs/</argument>
-                      <argument>${cudf.version}</argument>
+                      <argument>cudautils.py</argument>
+                      <argument>c</argument>
                       <argument>${cudf.classifier}</argument>
                   </arguments>
+                  <workingDirectory>${user.dir}</workingDirectory>
               </configuration>
           </plugin>
           <plugin>
@@ -104,8 +102,6 @@
                           <executable>python</executable>
                           <arguments>
                             <argument>create_jni.py</argument>
-                            <argument>${cuda.version}</argument>
-                            <argument>${user.dir}/../build/extra-libs/</argument>
                           </arguments>
                           <workingDirectory>${user.dir}</workingDirectory>
                       </configuration>

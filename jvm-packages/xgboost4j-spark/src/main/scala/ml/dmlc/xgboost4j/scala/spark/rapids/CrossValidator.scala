@@ -24,28 +24,56 @@ import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostClassif
 import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.tuning.{CrossValidatorModel, RapidsCrossValidatorModel}
 import org.apache.spark.ml.{Model, PipelineStage, tuning}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Dataset
-import org.json4s.JValue
-import org.json4s.JsonDSL.map2jvalue
+import org.json4s.JsonDSL.{map2jvalue, _}
+import org.json4s.{JValue, _}
 import org.json4s.jackson.JsonMethods.{compact, render}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Awaitable, ExecutionContext, Future}
 import scala.util.control.NonFatal
-import org.json4s._
-import org.json4s.JsonDSL._
+
+/*
+ * @param lb lower bound of the acceptance range
+ * @param ub upper bound of the acceptance range
+ * @param seed
+ * @param complement whether to use the complement of the range specified, default to false
+ */
+case class GpuSampler(lb: Double, ub: Double, seed: Long, complement: Boolean = false) {
+  val roundingEpsilon = 1e-6
+  /** epsilon slop to avoid failure from floating point jitter. */
+  require(
+    lb <= (ub + roundingEpsilon),
+    s"Lower bound ($lb) must be <= upper bound ($ub)")
+  require(
+    lb >= (0.0 - roundingEpsilon),
+    s"Lower bound ($lb) must be >= 0.0")
+  require(
+    ub <= (1.0 + roundingEpsilon),
+    s"Upper bound ($ub) must be <= 1.0")
+}
 
 class CrossValidator extends tuning.CrossValidator {
 
+  override def fit(dataset: Dataset[_]): CrossValidatorModel = {
+    if (PluginUtils.isSupportColumnar(dataset)) {
+      train(dataset)
+    } else {
+      super.fit(dataset)
+    }
+  }
+
   /**
    * Fits a single model to the input data.
-   * @param dataset input GpuDataset
+   *
+   * @param dataset input Dataset
    * @return best Model which should be used as asInstanceOf[XGBoostClassificationModel] or
    *         asInstanceOf[XGBoostRegressionModel] accordingly
    */
-  def fit(dataset: GpuDataset): Model[_] = {
+  private def train(dataset: Dataset[_]): CrossValidatorModel = {
     val instr = new Instrumentation
     val schema = dataset.schema
     val est = $(estimator)
@@ -72,22 +100,22 @@ class CrossValidator extends tuning.CrossValidator {
       // Fit models in a Future for training in parallel
       val foldMetricFutures = epm.zipWithIndex.map { case (paramMap, paramIndex) =>
         Future[Double] {
-          val training = dataset.sampling(lb, up, $(seed), true)
-          val validationDataset = dataset.sampling(lb, up, $(seed), false)
+
+          val trainingSampler = Some(GpuSampler(lb, up, $(seed), true))
+          val validationSampler = Some(GpuSampler(lb, up, $(seed), false))
+
           instr.logDebug(s"Train split $splitIndex with multiple sets of parameters.")
           var model: Model[_] = null
 
           val evalDf = est match {
             case classifier: XGBoostClassifier =>
-              model = classifier.copy(paramMap).fit(training)
-              model.asInstanceOf[XGBoostClassificationModel]
-                .transformWithColumn(validationDataset, Some(classifier.getLabelCol))
-                .cache()
+              model = classifier.copy(paramMap).trainWithGpuSampler(dataset, trainingSampler)
+              model.asInstanceOf[XGBoostClassificationModel].transformWithGpuSampler(
+                dataset, validationSampler, Some(classifier.getLabelCol))
             case regressor: XGBoostRegressor =>
-              model = regressor.copy(paramMap).fit(training)
-              model.asInstanceOf[XGBoostRegressionModel]
-                .transformWithColumn(validationDataset, Some(regressor.getLabelCol))
-                .cache()
+              model = regressor.copy(paramMap).trainWithGpuSampler(dataset, trainingSampler)
+              model.asInstanceOf[XGBoostRegressionModel].transformWithGpuSampler(
+                dataset, validationSampler, Some(regressor.getLabelCol))
             case _ => throw new IllegalArgumentException("Only XGBoostRegressor and " +
               "XGBoostClassifier are supported"
             )
@@ -98,15 +126,7 @@ class CrossValidator extends tuning.CrossValidator {
           }
 
           val metric = eval.evaluate(evalDf)
-          evalDf.unpersist()
-
           instr.logDebug(s"Got metric $metric for model trained with $paramMap.")
-          // Booster holds a pointer to native gpu memory. if Booster is not disposed.
-          // then GPU memory will leak. From upstream. Booster's finalize (dispose) depends
-          // on JVM GC. GC is not triggered freqently, which means gpu memory already leaks.
-          // The fix is force GC in the end of each unit test.
-          System.gc()
-          System.runFinalization()
           metric
         }(executionContext)
       }
@@ -133,27 +153,27 @@ class CrossValidator extends tuning.CrossValidator {
         "XGBoostClassifier are supported"
       )
     }
-//    copyValues(new CrossValidatorModel(uid, bestModel, metrics)
-//      .setSubModels(subModels).setParent(this))
-    bestModel
+
+    copyValues(RapidsCrossValidatorModel.createCrossValidatorModel(
+      uid, bestModel, metrics.toArray, subModels).setParent(this))
   }
 
-  def awaitResult[T](awaitable: Awaitable[T], atMost: Duration): T = {
+  private def awaitResult[T](awaitable: Awaitable[T], atMost: Duration): T = {
     try {
       // `awaitPermission` is not actually used anywhere so it's safe to pass in null here.
       // See SPARK-13747.
       val awaitPermission = null.asInstanceOf[scala.concurrent.CanAwait]
       awaitable.result(atMost)(awaitPermission)
     } catch {
-//      case e: SparkFatalException =>
-//        throw e.throwable
+      //      case e: SparkFatalException =>
+      //        throw e.throwable
       // TimeoutException is thrown in the current thread, so not need to warp the exception.
       case NonFatal(t) if !t.isInstanceOf[TimeoutException] =>
         throw new SparkException("Exception thrown in awaitResult: ", t)
     }
   }
 
-  def newDaemonCachedThreadPool(
+  private def newDaemonCachedThreadPool(
       prefix: String, maxThreadNumber: Int, keepAliveSeconds: Int = 60): ThreadPoolExecutor = {
     val threadFactory = new ThreadFactoryBuilder().setDaemon(true).setNameFormat(prefix + "-%d")
       .build()
@@ -168,7 +188,7 @@ class CrossValidator extends tuning.CrossValidator {
     threadPool
   }
 
-  def getExecutionContexts: ExecutionContext = {
+  private def getExecutionContexts: ExecutionContext = {
     getParallelism match {
       case 1 =>
         ExecutionContext.fromExecutorService(MoreExecutors.sameThreadExecutor())
@@ -180,7 +200,7 @@ class CrossValidator extends tuning.CrossValidator {
     }
   }
 
-  def logParams(hasParams: Params, params: Param[_]*): Unit = {
+  private def logParams(hasParams: Params, params: Param[_]*): Unit = {
     val pairs: Seq[(String, JValue)] = for {
       p <- params
       value <- hasParams.get(p)
@@ -191,18 +211,20 @@ class CrossValidator extends tuning.CrossValidator {
     logInfo(compact(render(map2jvalue(pairs.toMap))))
   }
 
-  def logTuningParam(instrumentation: Instrumentation): Unit = {
+  private def logTuningParam(instrumentation: Instrumentation): Unit = {
     instrumentation.logNamedValue("estimator", $(estimator).getClass.getCanonicalName)
     instrumentation.logNamedValue("evaluator", $(evaluator).getClass.getCanonicalName)
     instrumentation.logNamedValue("estimatorParamMapsLength", $(estimatorParamMaps).length)
   }
 }
 
-class Instrumentation extends Logging {
+private class Instrumentation extends Logging {
   val prefix = "GPU CrossValidator "
+
   override def logInfo(msg: => String): Unit = {
     super.logInfo(prefix + msg)
   }
+
   /**
    * Logs a debug message with a prefix that uniquely identifies the training session.
    */
@@ -220,6 +242,7 @@ class Instrumentation extends Logging {
     }
     logInfo(compact(render(map2jvalue(pairs.toMap))))
   }
+
   /**
    * Log some data about the dataset being fit.
    */
@@ -232,6 +255,7 @@ class Instrumentation extends Logging {
     logInfo(s"training: numPartitions=${dataset.partitions.length}" +
       s" storageLevel=${dataset.getStorageLevel}")
   }
+
   /**
    * Logs the value with customized name field.
    */
@@ -242,6 +266,7 @@ class Instrumentation extends Logging {
   def logNamedValue(name: String, value: Long): Unit = {
     logInfo(compact(render(name -> value)))
   }
+
   /**
    * Log some info about the pipeline stage being fit.
    */

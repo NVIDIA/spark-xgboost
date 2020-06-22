@@ -34,11 +34,11 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <flink.version>1.7.2</flink.version>
-        <spark.version>3.0.0-preview2</spark.version>
+        <spark.version>3.0.0</spark.version>
         <scala.version>2.12.8</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
-        <cudf.version>0.13-SNAPSHOT</cudf.version>
-        <cudf.classifier></cudf.classifier>
+        <cudf.version>0.14</cudf.version>
+        <cudf.classifier>cuda10-1</cudf.classifier>
     </properties>
     <repositories>
         <repository>
@@ -53,7 +53,7 @@
     </modules>
     <profiles>
         <profile>
-            <id>cuda10.0</id>
+            <id>cuda10.1</id>
             <properties>
                 <cudf.classifier></cudf.classifier>
             </properties>
@@ -289,50 +289,6 @@
             </resource>
         </resources>
         <plugins>
-            <plugin>
-                <groupId>org.codehaus.gmaven</groupId>
-                <artifactId>gmaven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>setProperties</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>execute</goal>
-                        </goals>
-                        <configuration>
-                            <source>
-                                def standardOut = new StringBuffer()
-                                def standardErr = new StringBuffer()
-
-                                def process = 'nvcc --version'.execute()
-                                process.consumeProcessOutput(standardOut, standardErr)
-                                process.waitForOrKill(10000)
-
-                                def cudaLine = ~/Cuda compilation tools, release [.0-9]+, V([.0-9]+)/
-                                def matcher = cudaLine.matcher(standardOut)
-                                if (matcher.find()) {
-                                    switch (matcher.group(1)) {
-                                        case ~/10\\.0\\..*/:
-                                            pom.properties['cuda.version'] = 'cuda10.0'
-                                            break;
-                                        case ~/9\\.2\\..*/:
-                                            pom.properties['cuda.version'] = 'cuda9.2'
-                                            break;
-					case ~/10\\.1\\..*/:
-					    pom.properties['cuda.version'] = 'cuda10.1'
-					    break;
-                                        default:
-                                            fail('Could not find a CUDA 9.2, 10.0 or 10.1')
-                                            break;
-                                    }
-                                } else {
-                                    fail("Could not find CUDA: $standardOut $standardErr")
-                                }
-                            </source>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>

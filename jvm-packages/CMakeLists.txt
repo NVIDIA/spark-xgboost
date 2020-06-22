@@ -4,11 +4,6 @@ if (USE_CUDF)
   add_definitions(-DXGBOOST_USE_CUDF)
 endif (USE_CUDF)
 
-# The APIs of rmm used by XGBoost now are no longer header files only,
-# Add rmm library into dependence list.
-add_library(rmm SHARED IMPORTED)
-set_target_properties(rmm PROPERTIES IMPORTED_LOCATION ${RMM_LIBRARY})
-
 add_library(xgboost4j SHARED
   ${PROJECT_SOURCE_DIR}/jvm-packages/xgboost4j/src/native/xgboost4j.cpp
   ${PROJECT_SOURCE_DIR}/jvm-packages/xgboost4j-spark/src/native/xgboost4j_spark.cpp
@@ -17,8 +12,6 @@ target_include_directories(xgboost4j
   PRIVATE
   ${JNI_INCLUDE_DIRS}
   ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
-  ${CUDF_INCLUDE_DIR}
-  ${RMM_INCLUDE_DIR}
   ${PROJECT_SOURCE_DIR}/jvm-packages/xgboost4j/src/native
   ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/dmlc-core/include
@@ -31,7 +24,5 @@ set_target_properties(
   CXX_STANDARD_REQUIRED ON)
 target_link_libraries(xgboost4j
   PRIVATE
-  rmm
-  ${CUDF_LIBRARY}
   ${LINKED_LIBRARIES_PRIVATE}
   ${JAVA_JVM_LIBRARY})
