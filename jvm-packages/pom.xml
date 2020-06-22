@@ -53,21 +53,6 @@
     </modules>
     <profiles>
         <profile>
-            <id>local-repo</id>
-            <activation>
-                <property>
-                    <name>!release-build</name>
-                </property>
-            </activation>
-            <repositories>
-                <repository>
-                    <id>snapshots</id>
-                    <name>sw-spark-maven</name>
-                    <url>https://urm.nvidia.com:443/artifactory/sw-spark-maven</url>
-                </repository>
-            </repositories>
-        </profile>
-        <profile>
             <id>release</id>
             <build>
                 <plugins>
