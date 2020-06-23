@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>ai.rapids</groupId>
+        <groupId>com.nvidia</groupId>
         <artifactId>xgboost-jvm_3.0</artifactId>
         <version>1.0.0-Beta</version>
     </parent>
@@ -57,7 +57,7 @@
     </build>
     <dependencies>
         <dependency>
-            <groupId>ai.rapids</groupId>
+            <groupId>com.nvidia</groupId>
             <artifactId>xgboost4j_3.0</artifactId>
             <version>1.0.0-Beta</version>
         </dependency>

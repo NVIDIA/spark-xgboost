@@ -14,9 +14,12 @@
  limitations under the License.
  */
 
-package ai.rapids.cudf;
+package ml.dmlc.xgboost4j.java.rapids;
 
-import ml.dmlc.xgboost4j.java.rapids.ColumnData;
+import ai.rapids.cudf.BaseDeviceMemoryBuffer;
+import ai.rapids.cudf.BufferType;
+import ai.rapids.cudf.ColumnVector;
+import ai.rapids.cudf.DType;
 
 public class GpuColumnVectorUtils {
 

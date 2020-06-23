@@ -14,8 +14,8 @@ import groovy.transform.Field
 def utils
 
 def SERVERS_MAP = [
-    'Urm': 'https://urm.nvidia.com:443/artifactory/sw-spark-maven-local',
-    'Local': 'http://apt-sh04:8081/repository/xgboost-spark-release'
+    'Urm': ['https://urm.nvidia.com:443/artifactory/sw-spark-maven-local', 'snapshots'],
+    'Local': ['http://apt-sh04:8081/repository/xgboost-spark-release', 'spark.sw.nvidia.com']
 ]
 
 pipeline {
@@ -40,8 +40,8 @@ pipeline {
         LOCAL_ROOT='jenkins/local'
         BUILD_SCRIPT='$LOCAL_ROOT/build-jvm-multi.sh'
         DEPLOY_SCRIPT='$LOCAL_ROOT/deploy-jvm-multi.sh'
-        SERVER_ID='snapshots'
-        SERVER_URL = "${SERVERS_MAP."$DEPLOY_TYPE"}"
+        SERVER_URL = "${SERVERS_MAP["$DEPLOY_TYPE"][0]}"
+        SERVER_ID = "${SERVERS_MAP["$DEPLOY_TYPE"][1]}"
         URM_CREDS = credentials("svcngcc_artifactory")
     }
 
