@@ -17,15 +17,12 @@ package ml.dmlc.xgboost4j.java;
 
 import ai.rapids.cudf.ColumnVector;
 import ai.rapids.cudf.Cuda;
-import ai.rapids.cudf.GpuColumnVectorUtils;
-import ml.dmlc.xgboost4j.java.rapids.ColumnData;
+import ml.dmlc.xgboost4j.java.rapids.GpuColumnVectorUtils;
 
 import junit.framework.TestCase;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 import static org.junit.Assume.assumeTrue;
 
