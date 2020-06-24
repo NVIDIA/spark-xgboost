@@ -24,9 +24,9 @@
         </developer>
     </developers>
     <scm>
-        <connection>scm:git:git:/github.com/rapidsai/xgboost.git</connection>
-        <developerConnection>scm:git:ssh://github.com/rapidsai/xgboost.git</developerConnection>
-        <url>https://github.com/rapidsai/xgboost</url>
+        <connection>scm:git:git:/github.com/NVIDIA/spark-xgboost.git</connection>
+        <developerConnection>scm:git:ssh://github.com/NVIDIA/spark-xgboost.git</developerConnection>
+        <url>https://github.com/NVIDIA/spark-xgboost</url>
     </scm>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
