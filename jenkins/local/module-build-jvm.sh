@@ -8,58 +8,29 @@
 #
 ###
 
-MVN_ARG=$1
-MVN_LOCAL_REPO=$2
-ORIG_PATH=`pwd`
-XGB_ROOT=$WORKSPACE
-# Place extra libs in folder "build", then will be cleaned before each build.
-EXTRA_LIB_PATH=$XGB_ROOT/build/extra-libs
+MVN_EXTRA_ARGS=$@
+echo "MVN_ARG: " $MVN_EXTRA_ARGS
+WD=$WORKSPACE
+MVN="mvn -B -Dmaven.repo.local=$WD/.m2 -DskipTests"
+CUDA_UTIL=$WD/jvm-packages/cudautils.py
 
-echo "MVN_ARG: " $MVN_ARG
+SUPPORTED_VERS=(`$CUDA_UTIL l`)
+NUM_VERS=${#SUPPORTED_VERS[@]}
+echo "Supported cuda version: ${SUPPORTED_VERS[@]}"
 
-cd $XGB_ROOT/jvm-packages
-if [ "$MVN_LOCAL_REPO" == "" ]; then
-MVN_LOCAL_REPO=`mvn exec:exec -q -B --non-recursive \
-    -Dmaven.repo.local=$MVN_LOCAL_REPO \
-    -Dexec.executable=echo \
-    -Dexec.args='${settings.localRepository}'`
-fi
-echo "Maven local directory = $MVN_LOCAL_REPO"
+cd $WD/jvm-packages/
 
-#CUDF_VER=0.13-SNAPSHOT
-CUDF_VER=`mvn exec:exec -q -B --non-recursive \
-    -Dmaven.repo.local=$MVN_LOCAL_REPO \
-    -Dexec.executable=echo \
-    -Dexec.args='${cudf.version}'`
-echo "Current cudf version in pom = $CUDF_VER"
-
-# Suppose called under jvm-packages
-buildXgboost4j(){
+for ((i=$NUM_VERS-1;i>=0;i--)); do
+    CU_VER=${SUPPORTED_VERS[i]}
+    . /opt/tools/to_cudaver.sh $CU_VER
     rm -rf ../build
-    CUDA_VER=cuda$1
-    CUDF_CLASS=$2
-    . /opt/tools/to_$CUDA_VER.sh
-    if [ "$CUDA_VER" == cuda10.0 ]; then
-        mvn clean package -B -DskipTests $MVN_ARG -Dmaven.repo.local=$MVN_LOCAL_REPO
+    if [ $i -gt 0 ]; then
+        ./create_jni.py
     else
-        mvn dependency:get -B -Dmaven.repo.local=$MVN_LOCAL_REPO -Dtransitive=false \
-            -DgroupId=ai.rapids \
-            -DartifactId=cudf \
-            -Dversion=$CUDF_VER \
-            -Dclassifier=$CUDF_CLASS
-        ./prepare_extra_libs.sh \
-            $MVN_LOCAL_REPO \
-            $EXTRA_LIB_PATH \
-            $CUDF_VER \
-            $CUDF_CLASS
-        ./create_jni.py $CUDA_VER $EXTRA_LIB_PATH
+        CLASSIFIER=`$CUDA_UTIL g`
+        $MVN clean package -Dcudf.classifier=$CLASSIFIER $MVN_EXTRA_ARGS
     fi
-}
+done
 
-####### build xgboost4j .so for and 10.1 ##
-buildXgboost4j 10.1 cuda10-1
+cd $WD
 
-####### build xgboost4j .so for CUDA10.0 and jars ##
-buildXgboost4j 10.0
-
-cd $ORIG_PATH

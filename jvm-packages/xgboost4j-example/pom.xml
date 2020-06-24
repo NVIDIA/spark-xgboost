@@ -4,12 +4,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>ai.rapids</groupId>
+        <groupId>com.nvidia</groupId>
 	<artifactId>xgboost-jvm_2.11</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.0.0-Beta</version>
     </parent>
     <artifactId>xgboost4j-example_2.11</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0-Beta</version>
     <packaging>jar</packaging>
     <build>
         <plugins>
@@ -24,10 +24,10 @@
     </build>
     <dependencies>
         <dependency>
-            <groupId>ai.rapids</groupId>
+            <groupId>com.nvidia</groupId>
             <classifier>${cudf.classifier}</classifier>
             <artifactId>xgboost4j-spark_${scala.binary.version}</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>1.0.0-Beta</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
@@ -36,9 +36,9 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>ai.rapids</groupId>
+            <groupId>com.nvidia</groupId>
             <artifactId>xgboost4j-flink_${scala.binary.version}</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>1.0.0-Beta</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>

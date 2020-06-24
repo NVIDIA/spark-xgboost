@@ -2,7 +2,7 @@
  * Copyright 2020 by Contributors
  * \file gpu_column.h
  * \brief store cuDF column info
- * \author Bobby Wang 
+ * \author Bobby Wang
  */
 
 #ifndef XGBOOST_GPU_COLUMN_H

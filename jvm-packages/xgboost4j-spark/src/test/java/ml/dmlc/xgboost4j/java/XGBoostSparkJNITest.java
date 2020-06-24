@@ -16,9 +16,8 @@
 
 package ml.dmlc.xgboost4j.java;
 
-import ai.rapids.cudf.ColumnVector;
 import ai.rapids.cudf.Cuda;
-import ai.rapids.cudf.GpuColumnVectorUtils;
+import ml.dmlc.xgboost4j.java.rapids.GpuColumnVectorUtils;
 import ai.rapids.cudf.Table;
 import ml.dmlc.xgboost4j.java.rapids.ColumnData;
 

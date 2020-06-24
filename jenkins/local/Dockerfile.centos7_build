@@ -3,35 +3,29 @@ FROM centos:7
 # envs used by nvidia-docker
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=9.2 "ARG IMAGE_NAME
+ENV NVIDIA_REQUIRE_CUDA "cuda>=10.1 "ARG IMAGE_NAME
 
 # setup repo for cuda
 RUN NVIDIA_GPGKEY_SUM=d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5 && \
     curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/7fa2af80.pub | sed '/^Version/d' > /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA && \
     echo "$NVIDIA_GPGKEY_SUM  /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA" | sha256sum -c --strict -
-ADD https://gitlab.com/nvidia/cuda/raw/master/dist/centos7/9.2/base/cuda.repo /etc/yum.repos.d/cuda.repo
+ADD https://gitlab.com/nvidia/cuda/raw/master/dist/centos7/10.1/base/cuda.repo /etc/yum.repos.d/cuda.repo
 
 # install cuda
-ARG CUDA_A_VERSION=9-2-9.2.148-1
-ARG CUDA_B_VERSION=10-0-10.0.130-1
-ARG CUDA_C_VERSION=10-1-10.1.168-1
+ARG CUDA_A_VERSION=10-1-10.1.168-1
+ARG CUDA_B_VERSION=10-2-10.2.89-1
 RUN yum install -y \
     cuda-cudart-$CUDA_A_VERSION \
     cuda-cudart-$CUDA_B_VERSION \
-    cuda-cudart-$CUDA_C_VERSION \
     cuda-libraries-$CUDA_A_VERSION \
     cuda-libraries-$CUDA_B_VERSION \
-    cuda-libraries-$CUDA_C_VERSION \
     cuda-libraries-dev-$CUDA_A_VERSION \
     cuda-libraries-dev-$CUDA_B_VERSION \
-    cuda-libraries-dev-$CUDA_C_VERSION \
     cuda-command-line-tools-$CUDA_A_VERSION \
     cuda-command-line-tools-$CUDA_B_VERSION \
-    cuda-command-line-tools-$CUDA_C_VERSION \
     cuda-minimal-build-$CUDA_A_VERSION \
     cuda-minimal-build-$CUDA_B_VERSION \
-    cuda-minimal-build-$CUDA_C_VERSION \
-    cuda-compat-10-0
+    cuda-compat-10-1
 
 # setup cuda env
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
@@ -40,10 +34,8 @@ ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 
 # below has XGBoost related stuff
-ARG CUDA_A=cuda9.2
-ARG CUDA_B=cuda10.0
-ARG CUDA_C=cuda10.1
-ARG RAPIDS_VERSION=0.12
+ARG CUDA_A=cuda10.1
+ARG CUDA_B=cuda10.2
 
 # install basic softwares
 RUN yum install -y zlib-devel bzip2 centos-release-scl && \
@@ -53,45 +45,38 @@ RUN yum install -y zlib-devel bzip2 centos-release-scl && \
 RUN curl -o nccl_v2.4.7-1.zip https://codeload.github.com/NVIDIA/nccl/zip/v2.4.7-1 && \
     unzip nccl_v2.4.7-1.zip && \
     cd nccl-2.4.7-1 && \
-    ln -s cuda-9.2 /usr/local/cuda && \
+    ln -s cuda-10.1 /usr/local/cuda && \
     make -j4 src.build && \
     make pkg.txz.build && \
     tar -xf build/pkg/txz/nccl_2.4.7-1+${CUDA_A}_x86_64.txz -C /usr/local/ && \
     make clean && \
     rm -f /usr/local/cuda && \
-    ln -s cuda-10.0 /usr/local/cuda && \
+    ln -s cuda-10.2 /usr/local/cuda && \
     make -j4 src.build && \
     make pkg.txz.build && \
     tar -xf build/pkg/txz/nccl_2.4.7-1+${CUDA_B}_x86_64.txz -C /usr/local/ && \
-    make clean && \
-    rm -f /usr/local/cuda && \
-    ln -s cuda-10.1 /usr/local/cuda && \
-    make -j4 src.build && \
-    make pkg.txz.build && \
-    tar -xf build/pkg/txz/nccl_2.4.7-1+${CUDA_C}_x86_64.txz -C /usr/local/ && \
     cd .. && \
     rm -rf nccl-2.4.7-1 nccl_v2.4.7-1.zip /usr/local/cuda
 
 # install conda and softwares with it
 ARG CONDA_FILE=Miniconda3-4.6.14-Linux-x86_64.sh
-RUN curl -O https://repo.continuum.io/miniconda/$CONDA_FILE && \
+RUN curl -O -L https://repo.continuum.io/miniconda/$CONDA_FILE && \
     bash $CONDA_FILE -b -p /opt/conda && \
     rm -f $CONDA_FILE
 ENV PATH=/opt/conda/bin/:$PATH
 RUN conda init --all && \
     . ~/.bashrc && \
-    conda install -y cmake openjdk maven git && \
-    conda install -y -c rapidsai -c rapidsai-nightly -c numba -c conda-forge -c defaults libcudf=${RAPIDS_VERSION}
+    conda install -y cmake openjdk maven git
 
 # set default environments
-RUN ln -s cuda-10.0 /usr/local/cuda && \
-    ln -s nccl_2.4.7-1+${CUDA_B}_x86_64 /usr/local/nccl
+RUN git config --system user.name ci && \
+    git config --system user.email ci@github.com && \
+    ln -s cuda-10.1 /usr/local/cuda && \
+    ln -s nccl_2.4.7-1+${CUDA_A}_x86_64 /usr/local/nccl
 ENV JAVA_HOME=/opt/conda
 ENV NCCL_ROOT=/usr/local/nccl
 
 # add tools to switch between envs
-ADD centos7_to_cuda9.2.sh /opt/tools/to_cuda9.2.sh
-ADD centos7_to_cuda10.0.sh /opt/tools/to_cuda10.0.sh
-ADD centos7_to_cuda10.1.sh /opt/tools/to_cuda10.1.sh
+ADD to_cudaver.sh /opt/tools/to_cudaver.sh
 
 RUN chmod 777 /usr/local

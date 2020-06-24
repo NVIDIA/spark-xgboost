@@ -21,7 +21,6 @@ import java.util.List;
 
 import ai.rapids.cudf.ColumnVector;
 import ai.rapids.cudf.DType;
-import ai.rapids.cudf.GpuColumnVectorUtils;
 import ai.rapids.cudf.HostColumnVector;
 import ai.rapids.cudf.Table;
 
@@ -29,6 +28,7 @@ import org.apache.spark.sql.types.*;
 import org.apache.spark.util.random.BernoulliCellSampler;
 
 import ml.dmlc.xgboost4j.java.rapids.ColumnData;
+import ml.dmlc.xgboost4j.java.rapids.GpuColumnVectorUtils;
 import ml.dmlc.xgboost4j.scala.spark.rapids.GpuSampler;
 
 public class GpuColumnBatch {
