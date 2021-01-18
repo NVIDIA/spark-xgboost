@@ -284,7 +284,7 @@ object XGBoost extends Serializable {
               s" set value $missing) when you have SparseVector or Empty vector as your feature" +
               s" format. If you didn't use Spark's VectorAssembler class to build your feature " +
               s"vector but instead did so in a way that preserves zeros in your feature vector " +
-              s"you can avoid this check by using the 'allow_non_zero_missing parameter'" +
+              s"you can avoid this check by using the 'allow_non_zero_for_missing parameter'" +
               s" (only use if you know what you are doing)")
         }
         labeledPoint
@@ -388,7 +388,6 @@ object XGBoost extends Serializable {
     val attempt = TaskContext.get().attemptNumber.toString
     rabitEnv.put("DMLC_TASK_ID", taskId)
     rabitEnv.put("DMLC_NUM_ATTEMPT", attempt)
-    rabitEnv.put("DMLC_WORKER_STOP_PROCESS_ON_ERROR", "false")
     val numRounds = xgbExecutionParam.numRounds
     val makeCheckpoint = xgbExecutionParam.checkpointParam.isDefined && taskId.toInt == 0
     try {
@@ -581,6 +580,7 @@ object XGBoost extends Serializable {
     logger.info(s"Running XGBoost ${spark.VERSION} with parameters:\n${params.mkString("\n")}")
     val xgbParamsFactory = new XGBoostExecutionParamsFactory(params, trainingData.sparkContext)
     val xgbExecParams = xgbParamsFactory.buildXGBRuntimeParams
+    val xgbRabitParams = xgbParamsFactory.buildRabitParams.asJava
     val sc = trainingData.sparkContext
     val transformedTrainingData = composeInputData(trainingData, xgbExecParams.cacheTrainingSet,
       hasGroup, xgbExecParams.numWorkers)
@@ -599,6 +599,8 @@ object XGBoost extends Serializable {
           xgbExecParams.timeoutRequestWorkers,
           xgbExecParams.numWorkers,
           xgbExecParams.killSparkContextOnWorkerFailure)
+
+        tracker.getWorkerEnvs().putAll(xgbRabitParams)
         val rabitEnv = tracker.getWorkerEnvs
         val boostersAndMetrics = if (hasGroup) {
           trainForRanking(transformedTrainingData.left.get, xgbExecParams, rabitEnv, prevBooster,
@@ -1008,4 +1010,3 @@ private[spark] class LabeledPointGroupIterator(base: Iterator[XGBLabeledPoint])
     group
   }
 }
-

@@ -77,9 +77,9 @@ public class GpuColumnBatch extends CudfTable {
   }
 
   public double getMaxInColumn(int colIndex) {
-    Scalar scalar = getColumnVector(colIndex).max(DType.FLOAT64);
+    Scalar scalar = getColumnVector(colIndex).max(DType.FLOAT32);
     if (scalar.isValid()) {
-      return scalar.getDouble();
+      return (double) scalar.getFloat();
     } else {
       throw new RuntimeException("Invalid scalar for column at " + colIndex);
     }

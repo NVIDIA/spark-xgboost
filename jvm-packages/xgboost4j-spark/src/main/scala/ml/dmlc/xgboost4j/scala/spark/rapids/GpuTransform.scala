@@ -190,7 +190,9 @@ private[spark] object GpuTransform {
                     (0 until table.getNumberOfColumns).map(table.getColumn(_).getType))
                 }
 
-                val devCb = GpuColumnVector.from(table)
+                val dataTypes = bOrigSchema.value.fields.map(x => x.dataType)
+
+                val devCb = GpuColumnVector.from(table, dataTypes)
 
                 try {
                   cb = new ColumnarBatch(

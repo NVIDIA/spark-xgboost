@@ -1,3 +1,4 @@
+#!/usr/local/env groovy
 @Library('shared-libs') _
 
 pipeline {
@@ -6,9 +7,9 @@ pipeline {
     triggers { cron('H 3 * * *') }
 
     parameters {
-        string(name: 'SOURCE_BRANCH', defaultValue: 'cudf-interop')
-        string(name: 'TARGET_BRANCH', defaultValue: 'nv-cudf-interop')
-        string(name: 'REF', defaultValue: 'nv-cudf-interop')
+        string(name: 'SOURCE_BRANCH', defaultValue: 'master')
+        string(name: 'TARGET_BRANCH', defaultValue: 'nvmain')
+        string(name: 'REF', defaultValue: 'nvmain')
     }
 
     stages {
@@ -41,12 +42,25 @@ pipeline {
             script {
                 if (currentBuild.currentResult == "SUCCESS") {
                     updateGitlabCommitStatus(name: 'Jenkins CI', state: "success")
-                    slack("#rapidsai-spark-cicd", "Success", color: "#33CC33")
+                    slack("#swrapids-spark-cicd", "Success", color: "#33CC33")
                 } else {
                     updateGitlabCommitStatus(name: 'Jenkins CI', state: "failed")
-                    slack("#rapidsai-spark-cicd", "Failed", color: "#FF0000")
+                    slack("#swrapids-spark-cicd", "Failed", color: "#FF0000")
                 }
             }
         }
     }
+}
+
+void slack(Map params = [:], String channel, String message) {
+    Map defaultParams = [
+            color: "#000000",
+            baseUrl: "https://nvidia.slack.com/services/hooks/jenkins-ci/",
+            tokenCredentialId: "slack_token"
+    ]
+
+    params["channel"] = channel
+    params["message"] = "${BUILD_URL}\n" + message
+
+    slackSend(defaultParams << params)
 }

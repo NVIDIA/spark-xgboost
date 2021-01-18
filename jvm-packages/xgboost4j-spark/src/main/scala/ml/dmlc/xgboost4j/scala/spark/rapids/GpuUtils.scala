@@ -29,7 +29,7 @@ private[spark] object GpuUtils {
   // APIs for plugin related
   def isRapidsEnabled(data: Dataset[_]): Boolean = {
     val pluginName = data.sparkSession.sparkContext.getConf.get("spark.sql.extensions", "")
-    pluginName == "com.nvidia.spark.rapids.SQLExecPlugin"
+    pluginName.split(",").contains("com.nvidia.spark.rapids.SQLExecPlugin")
   }
 
   // scalastyle:off classforname

@@ -11,6 +11,7 @@ if (USE_CUDA)
 endif (USE_CUDA)
 
 add_library(xgboost4j SHARED ${JVM_SOURCES} ${XGBOOST_OBJ_SOURCES})
+
 if (ENABLE_ALL_WARNINGS)
   target_compile_options(xgboost4j PUBLIC -Wall -Wextra)
 endif (ENABLE_ALL_WARNINGS)
