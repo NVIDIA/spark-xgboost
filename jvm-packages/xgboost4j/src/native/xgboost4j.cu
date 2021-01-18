@@ -1,5 +1,4 @@
 #include <jni.h>
-#include <thrust/device_vector.h>
 #include <thrust/system/cuda/experimental/pinned_allocator.h>
 
 #include "../../../../src/common/device_helpers.cuh"
@@ -19,11 +18,11 @@ template <typename T, typename Alloc> T *RawPtr(std::vector<T, Alloc> &data) {
   return data.data();
 }
 
-template <typename T> T const *RawPtr(thrust::device_vector<T> const &data) {
+template <typename T> T const *RawPtr(dh::device_vector<T> const &data) {
   return data.data().get();
 }
 
-template <typename T> T *RawPtr(thrust::device_vector<T> &data) {
+template <typename T> T *RawPtr(dh::device_vector<T> &data) {
   return data.data().get();
 }
 
@@ -107,7 +106,7 @@ void CopyInterface(std::vector<xgboost::ArrayInterface> const &interface_arr,
   }
 }
 
-void CopyMetaInfo(Json *p_interface, thrust::device_vector<float> *out, cudaStream_t stream) {
+void CopyMetaInfo(Json *p_interface, dh::device_vector<float> *out, cudaStream_t stream) {
   auto &j_interface = *p_interface;
   CHECK_EQ(get<Array const>(j_interface).size(), 1);
   auto object = get<Object>(get<Array>(j_interface)[0]);
@@ -145,15 +144,15 @@ class DataIteratorProxy {
       host_columns_;
   // TODO(Bobby): Use this instead of `host_columns_` if staging is not
   // required.
-  std::vector<std::unique_ptr<DataFrame<thrust::device_vector<char>,
-                                        thrust::device_vector<std::uint8_t>>>>
+  std::vector<std::unique_ptr<DataFrame<dh::device_vector<char>,
+                                        dh::device_vector<std::uint8_t>>>>
       device_columns_;
 
   // Staging area for metainfo.
   // TODO(Bobby): label_upper_bound, label_lower_bound, group.
-  std::vector<std::unique_ptr<thrust::device_vector<float>>> labels_;
-  std::vector<std::unique_ptr<thrust::device_vector<float>>> weights_;
-  std::vector<std::unique_ptr<thrust::device_vector<float>>> base_margins_;
+  std::vector<std::unique_ptr<dh::device_vector<float>>> labels_;
+  std::vector<std::unique_ptr<dh::device_vector<float>>> weights_;
+  std::vector<std::unique_ptr<dh::device_vector<float>>> base_margins_;
   std::vector<Json> label_interfaces_;
   std::vector<Json> weight_interfaces_;
   std::vector<Json> margin_interfaces_;
@@ -163,10 +162,10 @@ class DataIteratorProxy {
   bool initialized_{false};
   jobject last_batch_ {nullptr};
 
-  // Temp buffer on device, each `thrust::device_vector` represents a column
+  // Temp buffer on device, each `dh::device_vector` represents a column
   // from cudf.
-  std::vector<thrust::device_vector<char>> staging_data_;
-  std::vector<thrust::device_vector<uint8_t>> staging_mask_;
+  std::vector<dh::device_vector<char>> staging_data_;
+  std::vector<dh::device_vector<uint8_t>> staging_mask_;
 
   cudaStream_t copy_stream_;
 
@@ -195,7 +194,7 @@ class DataIteratorProxy {
 
     Json label = json_interface["label_str"];
     CHECK(!IsA<Null>(label));
-    labels_.emplace_back(new thrust::device_vector<float>);
+    labels_.emplace_back(new dh::device_vector<float>);
     CopyMetaInfo(&label, labels_.back().get(), copy_stream_);
     label_interfaces_.emplace_back(label);
 
@@ -206,7 +205,7 @@ class DataIteratorProxy {
     if (json_map.find("weight_str") != json_map.cend()) {
       Json weight = json_interface["weight_str"];
       CHECK(!IsA<Null>(weight));
-      weights_.emplace_back(new thrust::device_vector<float>);
+      weights_.emplace_back(new dh::device_vector<float>);
       CopyMetaInfo(&weight, weights_.back().get(), copy_stream_);
       weight_interfaces_.emplace_back(weight);
 
@@ -216,7 +215,7 @@ class DataIteratorProxy {
 
     if (json_map.find("basemargin_str") != json_map.cend()) {
       Json basemargin = json_interface["basemargin_str"];
-      base_margins_.emplace_back(new thrust::device_vector<float>);
+      base_margins_.emplace_back(new dh::device_vector<float>);
       CopyMetaInfo(&basemargin, base_margins_.back().get(), copy_stream_);
       margin_interfaces_.emplace_back(basemargin);
 

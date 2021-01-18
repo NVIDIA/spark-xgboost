@@ -28,6 +28,12 @@
 #include "xgboost4j_spark_gpu.h"
 #include "xgboost4j_spark.h"
 
+#if defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
+#include "rmm/mr/device/per_device_resource.hpp"
+#include "rmm/mr/device/thrust_allocator_adaptor.hpp"
+#include "rmm/device_buffer.hpp"
+#endif  // defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
+
 struct gpu_column_data {
   long* data_ptr;
   long* valid_ptr;
@@ -41,25 +47,43 @@ namespace spark {
 /*! \brief utility class to track GPU allocations */
 class unique_gpu_ptr {
   void* ptr;
+  const size_t size;
 
 public:
   unique_gpu_ptr(unique_gpu_ptr const&) = delete;
   unique_gpu_ptr& operator=(unique_gpu_ptr const&) = delete;
 
-  unique_gpu_ptr(unique_gpu_ptr&& other) noexcept : ptr(other.ptr) {
+  unique_gpu_ptr(unique_gpu_ptr&& other) noexcept : ptr(other.ptr), size(other.size) {
     other.ptr = nullptr;
   }
 
-  unique_gpu_ptr(size_t size) : ptr(nullptr) {
-    cudaError_t status = cudaMalloc(&ptr, size);
+  unique_gpu_ptr(size_t _size) : ptr(nullptr), size(_size) {
+#if defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
+    rmm::mr::device_memory_resource *mr = rmm::mr::get_current_device_resource();
+    try {
+      ptr = mr->allocate(_size, nullptr);
+    } catch (rmm::bad_alloc const& e) {
+      auto what = std::string("Could not allocate memory from RMM: ") +
+        (e.what() == nullptr ? "" : e.what());
+      std::cerr << what << std::endl;
+      throw std::bad_alloc();
+    }
+#else
+    cudaError_t status = cudaMalloc(&ptr, _size);
     if (status != cudaSuccess) {
       throw std::bad_alloc();
     }
+#endif
   }
 
   ~unique_gpu_ptr() {
     if (ptr != nullptr) {
+#if defined(XGBOOST_USE_RMM) && XGBOOST_USE_RMM == 1
+      rmm::mr::device_memory_resource *mr = rmm::mr::get_current_device_resource();
+      mr->deallocate(ptr, size);
+#else
       cudaFree(ptr);
+#endif
     }
   }
 
