@@ -380,7 +380,7 @@ private[spark] object GpuXGBoost {
       .groupBy(groupName)
       .agg(collect_list(struct(schema.fieldNames.map(col): _*)) as "list")
 
-    implicit val encoder = RowEncoder(schema)
+    implicit val encoder = RowEncoder.encoderFor(schema)
     // Expand the grouped rows after repartition
     groupedDF.repartition(nWorkers).mapPartitions(iter => {
       new Iterator[Row] {
